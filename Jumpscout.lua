@@ -27,7 +27,7 @@ M = {
         first_frame = true,
         script_started = true,
         letters_million = {"M", "O", "O", "N"},
-        letters_premium = {"Beta"}
+        letters_premium = {"stable"}
     },
 
     colors = {
@@ -43,8 +43,8 @@ M = {
     KNIFE_RANGE = 80,
     ZEUS_RANGE = 140,
 
-    watermark_custom_text = "Moon - dev",
-    apex_watermark_text = "Moon - dev",
+    watermark_custom_text = "Moon - stable",
+    apex_watermark_text = "Moon - stable",
     game_text = "game",
     sense_text = "sense",
 
@@ -71,7 +71,7 @@ M = {
             stable_alpha = 0,
             stable_fade_dir = 1,
             custom_million_text = "Moon",
-            custom_stable_text = "beta",
+            custom_stable_text = "stable",
             wave_position = 0,
             wave_speed = 80,
             glitch_last_update = 0,
@@ -785,7 +785,7 @@ M.drag_offset.active_streaks = {x = 0, y = 0}
 M.drag_offset.round_stats = {x = 0, y = 0}
 
 M.initial_positions = {
-    millionware = true,
+    moon = true,
     gamesense = true,
     apex = true
 }
@@ -844,7 +844,7 @@ M.watermarks_combo = gui.combo_box(gui.control_id("watermarks"))
 M.watermarks_combo.allow_multiple = true
 
 local watermark_options = {
-    {"Millionware", 1},
+    {"moon", 1},
     {"Gamesense", 2},
     {"Bottom Watermark", 4},
 }
@@ -1339,7 +1339,7 @@ M.watermark_text_input = gui.text_input(gui.control_id("watermark_custom_text"))
 M.watermark_text_input.placeholder = "custom watermark text"
 M.watermark_text_input:set_value(M.watermark_custom_text) 
 
-M.watermark_text_wrapper = gui.make_control("Millionware Txt", M.watermark_text_input)
+M.watermark_text_wrapper = gui.make_control("moon Txt", M.watermark_text_input)
 M.main.groupb:add(M.watermark_text_wrapper)
 smart_reset("groupb")
 
@@ -2495,7 +2495,7 @@ function M.render_legit_indicators()
     local d = draw.surface
     d.font = draw.fonts["gui_bold"]
 
-    local millionware_controls = {
+    local moon_controls = {
         {name = "jb", display = "JB", context = "misc>movement>jumpbug", bit = 1},
         {name = "ej", display = "EJ", context = "misc>movement>edge jump", bit = 2},
         {name = "tb", display = "TB", context = "legit>weapon>general>trigger>triggerbot", bit = 4}
@@ -2509,7 +2509,7 @@ function M.render_legit_indicators()
     local accent_color = M.accent_picker:get_value():get()
 
     local active_indicators = {}
-    for _, control in ipairs(millionware_controls) do
+    for _, control in ipairs(moon_controls) do
 
         if bit.band(selected_features, control.bit) ~= 0 then
             local context = gui.ctx:find(control.context)
