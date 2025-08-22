@@ -1,4 +1,4 @@
-﻿
+
 M = {
     main = {
         groupa = gui.ctx:find("lua>elements a"),
@@ -975,12 +975,12 @@ JUMPSCOUT.cb_enable    = gui.checkbox(gui.control_id("js_enable"))
 JUMPSCOUT.cb_forceauto = gui.checkbox(gui.control_id("js_forceauto"))
 
 JUMPSCOUT.sl_maxdz  = gui.slider(gui.control_id("js_maxdz"), 8, 128, 22)
-JUMPSCOUT.sl_ghc    = gui.slider(gui.control_id("js_ghc"), -600, 600, 68)
-JUMPSCOUT.sl_gmd    = gui.slider(gui.control_id("js_gmd"), -600, 600, 50)
-JUMPSCOUT.sl_gps    = gui.slider(gui.control_id("js_gps"), -600, 600, 60)
-JUMPSCOUT.sl_ahc    = gui.slider(gui.control_id("js_ahc"), -600, 600, 35)
-JUMPSCOUT.sl_amd    = gui.slider(gui.control_id("js_amd"), -600, 600, 16)
-JUMPSCOUT.sl_aps    = gui.slider(gui.control_id("js_aps"), -600, 600, 30)
+JUMPSCOUT.sl_ghc    = gui.slider(gui.control_id("js_ghc"), 0, 100, 68)
+JUMPSCOUT.sl_gmd    = gui.slider(gui.control_id("js_gmd"), 0, 125, 50)
+JUMPSCOUT.sl_gps    = gui.slider(gui.control_id("js_gps"), 0, 125, 60)
+JUMPSCOUT.sl_ahc    = gui.slider(gui.control_id("js_ahc"), 0, 100, 35)
+JUMPSCOUT.sl_amd    = gui.slider(gui.control_id("js_amd"), 0, 125, 16)
+JUMPSCOUT.sl_aps    = gui.slider(gui.control_id("js_aps"), 0, 125, 30)
 JUMPSCOUT.sl_hyst   = gui.slider(gui.control_id("js_hysteresis_pct"), 0, 100, 20)
 JUMPSCOUT.sl_ease   = gui.slider(gui.control_id("js_ease_pct"), 0, 100, 70)
 JUMPSCOUT.sl_smooth = gui.slider(gui.control_id("js_smooth_pct"), 0, 100, 35)
