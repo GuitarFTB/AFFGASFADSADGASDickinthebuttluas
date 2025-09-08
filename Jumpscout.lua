@@ -1,4 +1,3 @@
-
 M = {
     main = {
         groupa = gui.ctx:find("lua>elements a"),
@@ -23,11 +22,11 @@ M = {
 
     startup_anim = {
         active = true,
-        start_time = 0,
+        start_time = 5,
         first_frame = true,
         script_started = true,
-        letters_million = {"M", "O", "O", "N"},
-        letters_premium = {"stable"}
+        letters_Moon = {"Moon"},
+        letters_supporter = {"supporter"}
     },
 
     colors = {
@@ -43,8 +42,8 @@ M = {
     KNIFE_RANGE = 80,
     ZEUS_RANGE = 140,
 
-    watermark_custom_text = "Moon - stable",
-    apex_watermark_text = "Moon - stable",
+    watermark_custom_text = "Moon -  stable",
+    apex_watermark_text = "Moon -  stable",
     game_text = "game",
     sense_text = "sense",
 
@@ -70,8 +69,8 @@ M = {
             current_text = "- Standing -",
             stable_alpha = 0,
             stable_fade_dir = 1,
-            custom_million_text = "Moon",
-            custom_stable_text = "stable",
+            custom_Moon_text = "Moon",
+            custom_stable_text = " stable",
             wave_position = 0,
             wave_speed = 80,
             glitch_last_update = 0,
@@ -785,7 +784,7 @@ M.drag_offset.active_streaks = {x = 0, y = 0}
 M.drag_offset.round_stats = {x = 0, y = 0}
 
 M.initial_positions = {
-    moon = true,
+    Moonware = true,
     gamesense = true,
     apex = true
 }
@@ -831,12 +830,12 @@ function safe_add_control(group, control, label)
     print("  Control Type: " .. tostring(control.type))
 end
 
-local title_label = gui.label(gui.control_id("title_label"), "❀⋆.ೃ࿔*:❀⋆.ೃ࿔*:❀⋆.ೃ࿔*:❀⋆.ೃ࿔*:❀⋆.ೃ࿔*:･❀⋆.ೃ࿔*:°❀⋆.ೃ࿔*:Moon❀⋆.ೃ࿔*:❀⋆.ೃ࿔*:❀⋆.ೃ࿔*:❀⋆.ೃ࿔*:❀⋆.ೃ࿔*:❀⋆.ೃ࿔*:", draw.color(255, 255, 255, 255), true)
+local title_label = gui.label(gui.control_id("title_label"), "●══════⋆☆⋆══════●", draw.color(150, 95, 217, 255), true)
 M.main.groupa:add(title_label)
 smart_reset("groupa")
 
 M.accent_picker = gui.color_picker(gui.control_id("accent_color"))
-M.accent_picker:get_value():set(draw.color(183, 125, 212, 255))
+M.accent_picker:get_value():set(draw.color(197, 84, 214, 255))
 M.main.groupa:add(gui.make_control("Lua Accent Color", M.accent_picker))
 smart_reset("groupa")
 
@@ -844,7 +843,7 @@ M.watermarks_combo = gui.combo_box(gui.control_id("watermarks"))
 M.watermarks_combo.allow_multiple = true
 
 local watermark_options = {
-    {"moon", 1},
+    {"Moonware", 1},
     {"Gamesense", 2},
     {"Bottom Watermark", 4},
 }
@@ -929,105 +928,171 @@ M.main.groupa:add(damage_effects_wrapper)
 M.damage_effects_wrapper = damage_effects_wrapper 
 smart_reset("groupa")
 
-M.JUMPSCOUT_combo = gui.combo_box(gui.control_id("JUMPSCOUT"))
-M.JUMPSCOUT_combo.allow_multiple = true
 
-local JUMPSCOUT = {}
+-- JUMPSCOUT — Tabs on A, Controls on B, old value logic (editable), updated limits, None hides all,
+-- EMA smoothing default = 25
+JUMPSCOUT = JUMPSCOUT or {}
 
-JUMPSCOUT.name_cvar = game.cvar and game.cvar:find("name")
-JUMPSCOUT.my_name   = JUMPSCOUT.name_cvar and JUMPSCOUT.name_cvar.value or ""
-JUMPSCOUT.me, JUMPSCOUT.have_me = nil, false
+-- utils
+function JUMPSCOUT.clamp(x, lo, hi) if x < lo then return lo elseif x > hi then return hi else return x end end
+function JUMPSCOUT.lerp(a,b,t) return a + (b - a) * t end
+function JUMPSCOUT.smoothstep(t) t = JUMPSCOUT.clamp(t,0,1); return t*t*(3-2*t) end
 
-function JUMPSCOUT.clamp(x, lo, hi)
-    if x < lo then return lo elseif x > hi then return hi else return x end
-end
-
-function JUMPSCOUT.lerp(a, b, t)
-    return a + (b - a) * t
-end
-
-function JUMPSCOUT.smoothstep(t)
-    t = JUMPSCOUT.clamp(t, 0, 1)
-    return t * t * (3 - 2 * t)
-end
-
+-- control value helpers (old API)
 function JUMPSCOUT.getv(ctrl, default)
     if not ctrl then return default end
-    if ctrl.get_value then
-        local vp = ctrl:get_value()
-        if vp and vp.get then return vp:get() end
-    end
+    if ctrl.get_value then local vp = ctrl:get_value(); if vp and vp.get then return vp:get() end end
     if ctrl.get then return ctrl:get() end
     return default
 end
-
 function JUMPSCOUT.setv(ctrl, val)
     if not ctrl then return end
-    if ctrl.get_value then
-        local vp = ctrl:get_value()
-        if vp and vp.set then vp:set(val); return end
-    end
+    if ctrl.get_value then local vp = ctrl:get_value(); if vp and vp.set then vp:set(val); return end end
     if ctrl.set then ctrl:set(val) end
 end
 
-JUMPSCOUT.g = gui.ctx:find("lua>elements b")
-JUMPSCOUT.cb_enable    = gui.checkbox(gui.control_id("js_enable"))
-JUMPSCOUT.cb_forceauto = gui.checkbox(gui.control_id("js_forceauto"))
+-- groups: tabs on A, controls on B
+local GA = (M and M.main and (M.main.groupa or M.main.groupA)) or (gui.ctx and gui.ctx:find("lua>elements a"))
+local GB = (M and M.main and (M.main.groupb or M.main.groupB)) or (gui.ctx and gui.ctx:find("lua>elements b"))
+if not (GA and GB) then return end
 
-JUMPSCOUT.sl_maxdz  = gui.slider(gui.control_id("js_maxdz"), 8, 128, 22)
-JUMPSCOUT.sl_ghc    = gui.slider(gui.control_id("js_ghc"), 0, 100, 68)
-JUMPSCOUT.sl_gmd    = gui.slider(gui.control_id("js_gmd"), 0, 125, 50)
-JUMPSCOUT.sl_gps    = gui.slider(gui.control_id("js_gps"), 0, 125, 60)
-JUMPSCOUT.sl_ahc    = gui.slider(gui.control_id("js_ahc"), 0, 100, 35)
-JUMPSCOUT.sl_amd    = gui.slider(gui.control_id("js_amd"), 0, 125, 16)
-JUMPSCOUT.sl_aps    = gui.slider(gui.control_id("js_aps"), 0, 125, 30)
-JUMPSCOUT.sl_hyst   = gui.slider(gui.control_id("js_hysteresis_pct"), 0, 100, 20)
-JUMPSCOUT.sl_ease   = gui.slider(gui.control_id("js_ease_pct"), 0, 100, 70)
-JUMPSCOUT.sl_smooth = gui.slider(gui.control_id("js_smooth_pct"), 0, 100, 35)
+-- tabs (with "None")
+JUMPSCOUT.tabs = JUMPSCOUT.tabs or gui.combo_box(gui.control_id("js_tabs"))
+JUMPSCOUT.tabs.allow_multiple = true
+if not JUMPSCOUT.tab_sel then
+    JUMPSCOUT.tab_sel = {}
+    local opts = {
+        {"None",       "js_tab_none"},   -- 1
+        {"Main",       "js_tab_main"},   -- 2
+        {"Air/Ground", "js_tab_air"},    -- 4
+        {"Smoothing",  "js_tab_smooth"}, -- 8
+        {"Actions",    "js_tab_actions"} -- 16
+    }
+    for _,o in ipairs(opts) do
+        local name,id = o[1], o[2]
+        local sel = gui.selectable(gui.control_id(id), name)
+        JUMPSCOUT.tabs:add(sel)
+        JUMPSCOUT.tab_sel[name] = sel
+    end
+    JUMPSCOUT.tabs_wrapper = gui.make_control("Jumpscout Tabs", JUMPSCOUT.tabs)
+    GA:add(JUMPSCOUT.tabs_wrapper)
+end
 
-JUMPSCOUT.g:add(gui.make_control("Enable Smooth Jumpscout", JUMPSCOUT.cb_enable))
-JUMPSCOUT.g:add(gui.make_control("Auto Force Shoot In Air", JUMPSCOUT.cb_forceauto))
-JUMPSCOUT.g:add(gui.make_control("Max Eye ΔZ (t=1)", JUMPSCOUT.sl_maxdz))
-JUMPSCOUT.g:add(gui.make_control("Hysteresis %", JUMPSCOUT.sl_hyst))
-JUMPSCOUT.g:add(gui.make_control("Ease (smoothstep) %", JUMPSCOUT.sl_ease))
-JUMPSCOUT.g:add(gui.make_control("Smoothing (EMA) %", JUMPSCOUT.sl_smooth))
-JUMPSCOUT.g:add(gui.make_control("Ground Hitchance", JUMPSCOUT.sl_ghc))
-JUMPSCOUT.g:add(gui.make_control("Ground MinDamage", JUMPSCOUT.sl_gmd))
-JUMPSCOUT.g:add(gui.make_control("Ground PointScale", JUMPSCOUT.sl_gps))
-JUMPSCOUT.g:add(gui.make_control("Air Hitchance", JUMPSCOUT.sl_ahc))
-JUMPSCOUT.g:add(gui.make_control("Air MinDamage", JUMPSCOUT.sl_amd))
-JUMPSCOUT.g:add(gui.make_control("Air PointScale", JUMPSCOUT.sl_aps))
-JUMPSCOUT.g:reset()
+-- controls (OLD constructors w/ defaults; editable; updated limits)
+local function pad(s) return "    "..s end
+JUMPSCOUT.cb_enable    = JUMPSCOUT.cb_enable    or gui.checkbox(gui.control_id("js_enable"))
+JUMPSCOUT.cb_forceauto = JUMPSCOUT.cb_forceauto or gui.checkbox(gui.control_id("js_forceauto"))
 
-JUMPSCOUT.PATH_HC    = "rage>weapon>SSG-08>weapon>hitchance"
-JUMPSCOUT.PATH_MD    = "rage>weapon>SSG-08>weapon>mindamage"
-JUMPSCOUT.PATH_PS    = "rage>weapon>SSG-08>weapon>pointscale"
-JUMPSCOUT.PATH_FORCE = "rage>aimbot>general>force shoot"
+-- slider(id, min, max, default)
+JUMPSCOUT.sl_maxdz  = JUMPSCOUT.sl_maxdz  or gui.slider(gui.control_id("js_maxdz"),             8,   128, 22)
 
-JUMPSCOUT.vp_hc, JUMPSCOUT.vp_md, JUMPSCOUT.vp_ps, JUMPSCOUT.vp_force = nil, nil, nil, nil
+JUMPSCOUT.sl_hyst   = JUMPSCOUT.sl_hyst   or gui.slider(gui.control_id("js_hysteresis_pct"),    0,   100, 20)
+JUMPSCOUT.sl_ease   = JUMPSCOUT.sl_ease   or gui.slider(gui.control_id("js_ease_pct"),          0,   100, 70)
+JUMPSCOUT.sl_smooth = JUMPSCOUT.sl_smooth or gui.slider(gui.control_id("js_smooth_pct"),        0,   100, 25) -- default 25
+
+-- Updated limits per your request:
+-- Hitchance: [-1..125] (keep -1 for Auto), MinDamage: [0..125], PointScale: [0..200]
+JUMPSCOUT.sl_ghc    = JUMPSCOUT.sl_ghc    or gui.slider(gui.control_id("js_ghc"),               -1,   125, 68)
+JUMPSCOUT.sl_gmd    = JUMPSCOUT.sl_gmd    or gui.slider(gui.control_id("js_gmd"),                0,   125, 50)
+JUMPSCOUT.sl_gps    = JUMPSCOUT.sl_gps    or gui.slider(gui.control_id("js_gps"),                0,   200, 60)
+JUMPSCOUT.sl_ahc    = JUMPSCOUT.sl_ahc    or gui.slider(gui.control_id("js_ahc"),               -1,   125, 35)
+JUMPSCOUT.sl_amd    = JUMPSCOUT.sl_amd    or gui.slider(gui.control_id("js_amd"),                0,   125, 16)
+JUMPSCOUT.sl_aps    = JUMPSCOUT.sl_aps    or gui.slider(gui.control_id("js_aps"),                0,   200, 30)
+
+-- headers + wrappers on Group B (added once; NO per-frame reset)
+JUMPSCOUT.h_main   = JUMPSCOUT.h_main   or gui.label(gui.control_id("js_h_main"),   "Jumpscout  Main",       draw.color(200,200,200,255), true)
+JUMPSCOUT.h_air    = JUMPSCOUT.h_air    or gui.label(gui.control_id("js_h_air"),    "Jumpscout  Air/Ground", draw.color(200,200,200,255), true)
+JUMPSCOUT.h_smooth = JUMPSCOUT.h_smooth or gui.label(gui.control_id("js_h_smooth"), "Jumpscout  Smoothing",  draw.color(200,200,200,255), true)
+JUMPSCOUT.h_act    = JUMPSCOUT.h_act    or gui.label(gui.control_id("js_h_act"),    "Jumpscout  Actions",    draw.color(200,200,200,255), true)
+
+JUMPSCOUT.w_enable    = JUMPSCOUT.w_enable    or gui.make_control(pad("Enable Smooth Jumpscout"),  JUMPSCOUT.cb_enable)
+JUMPSCOUT.w_forceauto = JUMPSCOUT.w_forceauto or gui.make_control(pad("Auto Force Shoot In Air"),  JUMPSCOUT.cb_forceauto)
+JUMPSCOUT.w_maxdz     = JUMPSCOUT.w_maxdz     or gui.make_control(pad("Max Eye ΔZ (t=1)"),         JUMPSCOUT.sl_maxdz)
+
+JUMPSCOUT.w_hyst      = JUMPSCOUT.w_hyst      or gui.make_control(pad("Hysteresis %"),             JUMPSCOUT.sl_hyst)
+JUMPSCOUT.w_ease      = JUMPSCOUT.w_ease      or gui.make_control(pad("Ease (smoothstep) %"),      JUMPSCOUT.sl_ease)
+JUMPSCOUT.w_smooth    = JUMPSCOUT.w_smooth    or gui.make_control(pad("Smoothing (EMA) %"),        JUMPSCOUT.sl_smooth)
+
+JUMPSCOUT.w_ghc       = JUMPSCOUT.w_ghc       or gui.make_control(pad("Ground Hitchance"),         JUMPSCOUT.sl_ghc)
+JUMPSCOUT.w_gmd       = JUMPSCOUT.w_gmd       or gui.make_control(pad("Ground MinDamage"),         JUMPSCOUT.sl_gmd)
+JUMPSCOUT.w_gps       = JUMPSCOUT.w_gps       or gui.make_control(pad("Ground PointScale"),        JUMPSCOUT.sl_gps)
+JUMPSCOUT.w_ahc       = JUMPSCOUT.w_ahc       or gui.make_control(pad("Air Hitchance"),            JUMPSCOUT.sl_ahc)
+JUMPSCOUT.w_amd       = JUMPSCOUT.w_amd       or gui.make_control(pad("Air MinDamage"),            JUMPSCOUT.sl_amd)
+JUMPSCOUT.w_aps       = JUMPSCOUT.w_aps       or gui.make_control(pad("Air PointScale"),           JUMPSCOUT.sl_aps)
+
+if not JUMPSCOUT._added_to_B then
+    local g = GB
+    g:add(JUMPSCOUT.h_main)
+    g:add(JUMPSCOUT.w_enable); g:add(JUMPSCOUT.w_forceauto); g:add(JUMPSCOUT.w_maxdz)
+
+    g:add(JUMPSCOUT.h_air)
+    g:add(JUMPSCOUT.w_ghc); g:add(JUMPSCOUT.w_gmd); g:add(JUMPSCOUT.w_gps)
+    g:add(JUMPSCOUT.w_ahc); g:add(JUMPSCOUT.w_amd); g:add(JUMPSCOUT.w_aps)
+
+    g:add(JUMPSCOUT.h_smooth)
+    g:add(JUMPSCOUT.w_hyst); g:add(JUMPSCOUT.w_ease); g:add(JUMPSCOUT.w_smooth)
+
+    g:add(JUMPSCOUT.h_act)
+    if g.reset then g:reset() end
+    JUMPSCOUT._added_to_B = true
+end
+
+-- sections per tab
+JUMPSCOUT.sections = JUMPSCOUT.sections or {
+    ["None"]      = {},
+    ["Main"]      = {JUMPSCOUT.h_main,   JUMPSCOUT.w_enable, JUMPSCOUT.w_forceauto, JUMPSCOUT.w_maxdz},
+    ["Air/Ground"]= {JUMPSCOUT.h_air,    JUMPSCOUT.w_ghc, JUMPSCOUT.w_gmd, JUMPSCOUT.w_gps, JUMPSCOUT.w_ahc, JUMPSCOUT.w_amd, JUMPSCOUT.w_aps},
+    ["Smoothing"] = {JUMPSCOUT.h_smooth, JUMPSCOUT.w_hyst, JUMPSCOUT.w_ease, JUMPSCOUT.w_smooth},
+    ["Actions"]   = {JUMPSCOUT.h_act},
+}
+
+-- visibility (None hides everything; also default when mask==0)
+events.present_queue:add(function()
+    local v = JUMPSCOUT.tabs and JUMPSCOUT.tabs.get_value and JUMPSCOUT.tabs:get_value()
+    local mask = v and v.get and v:get() and v:get().get_raw and v:get():get_raw() or 0
+
+    local none_on    = (bit.band(mask, 1) ~= 0) or (mask == 0)
+    local show_main   = (not none_on) and (bit.band(mask, 2) ~= 0)
+    local show_air    = (not none_on) and (bit.band(mask, 4) ~= 0)
+    local show_smooth = (not none_on) and (bit.band(mask, 8) ~= 0)
+    local show_act    = (not none_on) and (bit.band(mask,16) ~= 0)
+
+    local function set_visible(list, vis)
+        for i=1,#list do list[i]:set_visible(vis) end
+    end
+    -- show nothing except None (empty section)
+    set_visible(JUMPSCOUT.sections["None"],       none_on)
+    set_visible(JUMPSCOUT.sections["Main"],       show_main)
+    set_visible(JUMPSCOUT.sections["Air/Ground"], show_air)
+    set_visible(JUMPSCOUT.sections["Smoothing"],  show_smooth)
+    set_visible(JUMPSCOUT.sections["Actions"],    show_act)
+end)
+
+-- ===== runtime (same OLD logic; reads controls, writes rage config) =====
+
+JUMPSCOUT.name_cvar = JUMPSCOUT.name_cvar or (game.cvar and game.cvar:find("name"))
+JUMPSCOUT.my_name   = (JUMPSCOUT.name_cvar and JUMPSCOUT.name_cvar.value) or (JUMPSCOUT.my_name or "")
+JUMPSCOUT.me, JUMPSCOUT.have_me = JUMPSCOUT.me or nil, JUMPSCOUT.have_me or false
+
+JUMPSCOUT.PATH_HC    = JUMPSCOUT.PATH_HC    or "rage>weapon>SSG-08>weapon>hitchance"
+JUMPSCOUT.PATH_MD    = JUMPSCOUT.PATH_MD    or "rage>weapon>SSG-08>weapon>mindamage"
+JUMPSCOUT.PATH_PS    = JUMPSCOUT.PATH_PS    or "rage>weapon>SSG-08>weapon>pointscale"
+JUMPSCOUT.PATH_FORCE = JUMPSCOUT.PATH_FORCE or "rage>aimbot>general>force shoot"
+
+JUMPSCOUT.vp_hc, JUMPSCOUT.vp_md, JUMPSCOUT.vp_ps, JUMPSCOUT.vp_force =
+    JUMPSCOUT.vp_hc or nil, JUMPSCOUT.vp_md or nil, JUMPSCOUT.vp_ps or nil, JUMPSCOUT.vp_force or nil
+
 function JUMPSCOUT.ensure_cfg_refs()
-    if not JUMPSCOUT.vp_hc then
-        local c = gui.ctx:find(JUMPSCOUT.PATH_HC)
-        if c and c.get_value then JUMPSCOUT.vp_hc = c:get_value() end
-    end
-    if not JUMPSCOUT.vp_md then
-        local c = gui.ctx:find(JUMPSCOUT.PATH_MD)
-        if c and c.get_value then JUMPSCOUT.vp_md = c:get_value() end
-    end
-    if not JUMPSCOUT.vp_ps then
-        local c = gui.ctx:find(JUMPSCOUT.PATH_PS)
-        if c and c.get_value then JUMPSCOUT.vp_ps = c:get_value() end
-    end
-    if not JUMPSCOUT.vp_force then
-        local c = gui.ctx:find(JUMPSCOUT.PATH_FORCE)
-        if c and c.get_value then JUMPSCOUT.vp_force = c:get_value() end
-    end
+    if not JUMPSCOUT.vp_hc then local c=gui.ctx:find(JUMPSCOUT.PATH_HC);    if c and c.get_value then JUMPSCOUT.vp_hc=c:get_value()    end end
+    if not JUMPSCOUT.vp_md then local c=gui.ctx:find(JUMPSCOUT.PATH_MD);    if c and c.get_value then JUMPSCOUT.vp_md=c:get_value()    end end
+    if not JUMPSCOUT.vp_ps then local c=gui.ctx:find(JUMPSCOUT.PATH_PS);    if c and c.get_value then JUMPSCOUT.vp_ps=c:get_value()    end end
+    if not JUMPSCOUT.vp_force then local c=gui.ctx:find(JUMPSCOUT.PATH_FORCE); if c and c.get_value then JUMPSCOUT.vp_force=c:get_value() end end
 end
 
 function JUMPSCOUT.on_ground(p)
     if p.m_fFlags and p.m_fFlags.get then
         local f = p.m_fFlags:get() or 0
-        return (bit.band(f, 1) == 1)
+        return (bit.band(f,1) == 1)
     end
     local v = (p.get_abs_velocity and p:get_abs_velocity()) or {x=0,y=0,z=0}
     return math.abs(v.z or 0) <= 5.0
@@ -1038,14 +1103,14 @@ events.present_queue:add(function()
     if S.have_me or S.my_name == "" then return end
     entities.players:for_each(function(e)
         local p = e.entity
-        if p and p:is_alive() and p:get_name() == S.my_name then
+        if p and p.is_alive and p:is_alive() and p.get_name and p:get_name() == S.my_name then
             S.me, S.have_me = p, true
             S.ensure_cfg_refs()
         end
     end)
 end)
 
-JUMPSCOUT.ema_t, JUMPSCOUT.last_state = 0.0, 0
+JUMPSCOUT.ema_t, JUMPSCOUT.last_state = JUMPSCOUT.ema_t or 0.0, JUMPSCOUT.last_state or 0
 events.present_queue:add(function()
     local S = JUMPSCOUT
     if not S.getv(S.cb_enable, false) then
@@ -1053,7 +1118,7 @@ events.present_queue:add(function()
         if S.vp_force then S.vp_force:set(false) end
         return
     end
-    if not (S.have_me and S.me and S.me:is_alive()) then return end
+    if not (S.have_me and S.me and S.me.is_alive and S.me:is_alive()) then return end
 
     S.ensure_cfg_refs()
     if not (S.vp_hc and S.vp_md and S.vp_ps and S.vp_force) then return end
@@ -1071,7 +1136,7 @@ events.present_queue:add(function()
         t_raw = 0.0
         S.last_state = 0
     else
-        local eye = S.me:get_eye_pos()
+        local eye = S.me.get_eye_pos and S.me:get_eye_pos()
         if not eye then return end
         local maxdz = math.max(8, S.getv(S.sl_maxdz, 22))
         t_raw = 0.5 + S.clamp((eye.z % maxdz)/maxdz, 0, 0.5)
@@ -1084,7 +1149,7 @@ events.present_queue:add(function()
     local ease_amt = S.clamp(S.getv(S.sl_ease, 70)/100.0, 0, 1)
     local eased = S.lerp(t_raw, S.smoothstep(t_raw), ease_amt)
 
-    local alpha = S.clamp(S.getv(S.sl_smooth, 35)/100.0, 0, 1)
+    local alpha = S.clamp(S.getv(S.sl_smooth, 25)/100.0, 0, 1)  -- default fallback 25
     S.ema_t = alpha * eased + (1 - alpha) * S.ema_t
 
     local ghc,gmd,gps = S.getv(S.sl_ghc,68), S.getv(S.sl_gmd,50), S.getv(S.sl_gps,60)
@@ -1099,144 +1164,6 @@ events.present_queue:add(function()
     S.vp_ps:set(out_ps)
 end)
 
-
--- tabs
-JUMPSCOUT.tabs = gui.combo_box(gui.control_id("js_tabs"))
-JUMPSCOUT.tabs.allow_multiple = true
-JUMPSCOUT.tab_opts = {
-  {"Main",      "js_tab_main"},
-  {"Air/Ground","js_tab_air"},
-  {"Smoothing", "js_tab_smooth"},
-  {"Actions",   "js_tab_actions"},
-}
-
-JUMPSCOUT.tab_sel = {}
-for _,o in ipairs(JUMPSCOUT.tab_opts) do
-  local name,id = o[1], o[2]
-  local sel = gui.selectable(gui.control_id(id), name)
-  JUMPSCOUT.tabs:add(sel)
-  JUMPSCOUT.tab_sel[name] = sel
-end
-
-JUMPSCOUT.tabs_wrapper = gui.make_control("Jumpscout Tabs", JUMPSCOUT.tabs)
-M.main.groupb:add(JUMPSCOUT.tabs_wrapper)
-smart_reset("groupb")
-
--- buttons under groupb (Actions)
-JUMPSCOUT.bt_export = gui.checkbox(gui.control_id("js_bt_export"))
-JUMPSCOUT.bt_import = gui.checkbox(gui.control_id("js_bt_import"))
-JUMPSCOUT.bt_reset  = gui.checkbox(gui.control_id("js_bt_reset"))
-M.main.groupb:add(gui.make_control("Export Jumpscout Config", JUMPSCOUT.bt_export))
-M.main.groupb:add(gui.make_control("Import Jumpscout Config", JUMPSCOUT.bt_import))
-M.main.groupb:add(gui.make_control("Reset Jumpscout Defaults", JUMPSCOUT.bt_reset))
-smart_reset("groupb")
-
--- helpers
-local function getv(c,d) if not c then return d end if c.get_value then local p=c:get_value(); if p and p.get then return p:get() end end if c.get then return c:get() end return d end
-local function setv(c,v) if not c then return end if c.get_value then local p=c:get_value(); if p and p.set then p:set(v); return end end if c.set then c:set(v) end end
-local function get_clip() if gui and gui.get_clipboard then return gui.get_clipboard() end if system and system.get_clipboard then return system.get_clipboard() end if clipboard and clipboard.get then return clipboard.get() end return "" end
-local function set_clip(t) if gui and gui.set_clipboard then gui.set_clipboard(t); return true end if system and system.set_clipboard then system.set_clipboard(t); return true end if clipboard and clipboard.set then clipboard.set(t); return true end return false end
-
--- pack/apply/parse
-local function js_pack()
-  return string.format(
-    "{enable=%s,force=%s,maxdz=%d,hyst=%d,ease=%d,smooth=%d,ghc=%d,gmd=%d,gps=%d,ahc=%d,amd=%d,aps=%d}",
-    tostring(getv(JUMPSCOUT.cb_enable,false)),
-    tostring(getv(JUMPSCOUT.cb_forceauto,false)),
-    math.floor(getv(JUMPSCOUT.sl_maxdz,22)+0.5),
-    math.floor(getv(JUMPSCOUT.sl_hyst,20)+0.5),
-    math.floor(getv(JUMPSCOUT.sl_ease,70)+0.5),
-    math.floor(getv(JUMPSCOUT.sl_smooth,35)+0.5),
-    math.floor(getv(JUMPSCOUT.sl_ghc,68)+0.5),
-    math.floor(getv(JUMPSCOUT.sl_gmd,50)+0.5),
-    math.floor(getv(JUMPSCOUT.sl_gps,60)+0.5),
-    math.floor(getv(JUMPSCOUT.sl_ahc,35)+0.5),
-    math.floor(getv(JUMPSCOUT.sl_amd,16)+0.5),
-    math.floor(getv(JUMPSCOUT.sl_aps,30)+0.5)
-  )
-end
-
-local function js_parse(s)
-  if not s or s=="" then return nil end
-  local t = {}
-  for k,v in s:gmatch("([%a_]+)%s*=%s*([%-%d%.]+)") do t[k]=tonumber(v) end
-  for k,v in s:gmatch("([%a_]+)%s*=%s*(true|false)") do t[k]=(v=="true") end
-  return next(t) and t or nil
-end
-
-local function js_apply(t)
-  local function n(x,lo,hi,def) x=tonumber(x or def) or def; if lo and x<lo then x=lo end; if hi and x>hi then x=hi end; return math.floor(x+0.5) end
-  if t.enable~=nil then setv(JUMPSCOUT.cb_enable,    t.enable) end
-  if t.force ~=nil then setv(JUMPSCOUT.cb_forceauto, t.force)  end
-  if t.maxdz then setv(JUMPSCOUT.sl_maxdz,  n(t.maxdz,8,128,22)) end
-  if t.hyst  then setv(JUMPSCOUT.sl_hyst,   n(t.hyst,0,100,20)) end
-  if t.ease  then setv(JUMPSCOUT.sl_ease,   n(t.ease,0,100,70)) end
-  if t.smooth then setv(JUMPSCOUT.sl_smooth,n(t.smooth,0,100,35)) end
-  if t.ghc   then setv(JUMPSCOUT.sl_ghc,    n(t.ghc,0,100,68)) end
-  if t.gmd   then setv(JUMPSCOUT.sl_gmd,    n(t.gmd,0,100,50)) end
-  if t.gps   then setv(JUMPSCOUT.sl_gps,    n(t.gps,0,100,60)) end
-  if t.ahc   then setv(JUMPSCOUT.sl_ahc,    n(t.ahc,0,100,35)) end
-  if t.amd   then setv(JUMPSCOUT.sl_amd,    n(t.amd,0,100,16)) end
-  if t.aps   then setv(JUMPSCOUT.sl_aps,    n(t.aps,0,100,30)) end
-end
-
--- runtime
-events.present_queue:add(function()
-  if getv(JUMPSCOUT.bt_export,false) then
-    set_clip(js_pack())
-    setv(JUMPSCOUT.bt_export,false)
-  end
-  if getv(JUMPSCOUT.bt_import,false) then
-    local t = js_parse(get_clip())
-    if t then js_apply(t) end
-    setv(JUMPSCOUT.bt_import,false)
-  end
-  if getv(JUMPSCOUT.bt_reset,false) then
-    js_apply({enable=false,force=false,maxdz=22,hyst=20,ease=70,smooth=35,ghc=68,gmd=50,gps=60,ahc=35,amd=16,aps=30})
-    setv(JUMPSCOUT.bt_reset,false)
-  end
-end)
-
-
-local function cfg_apply(t)
-  local function num(x,lo,hi,def) x=tonumber(x or def) or def; if lo and x<lo then x=lo end; if hi and x>hi then x=hi end; return math.floor(x+0.5) end
-  if t.maxdz   then setv(JUMPSCOUT.sl_maxdz,  num(t.maxdz,8,128,22)) end
-  if t.ghc     then setv(JUMPSCOUT.sl_ghc,    num(t.ghc,0,100,68)) end
-  if t.gmd     then setv(JUMPSCOUT.sl_gmd,    num(t.gmd,0,100,50)) end
-  if t.gps     then setv(JUMPSCOUT.sl_gps,    num(t.gps,0,100,60)) end
-  if t.ahc     then setv(JUMPSCOUT.sl_ahc,    num(t.ahc,0,100,35)) end
-  if t.amd     then setv(JUMPSCOUT.sl_amd,    num(t.amd,0,100,16)) end
-  if t.aps     then setv(JUMPSCOUT.sl_aps,    num(t.aps,0,100,30)) end
-  if t.hyst    then setv(JUMPSCOUT.sl_hyst,   num(t.hyst,0,100,20)) end
-  if t.ease    then setv(JUMPSCOUT.sl_ease,   num(t.ease,0,100,70)) end
-  if t.smooth  then setv(JUMPSCOUT.sl_smooth, num(t.smooth,0,100,35)) end
-  if t.enable~=nil then setv(JUMPSCOUT.cb_enable,    (tostring(t.enable)=="true")) end
-  if t.force ~=nil then setv(JUMPSCOUT.cb_forceauto, (tostring(t.force) =="true")) end
-end
-
-local function cfg_parse(s)
-  if not s or s=="" then return nil end
-  local t = {}
-  for k,v in s:gmatch("([%a_]+)%s*=%s*([%-%d%.]+)") do t[k]=tonumber(v) or v end
-  for k,v in s:gmatch("([%a_]+)%s*=%s*(true|false)") do t[k]=v end
-  return next(t) and t or nil
-end
-
-events.present_queue:add(function()
-  if getv(JUMPSCOUT.bt_export,false) then
-    set_clip(cfg_pack())
-    setv(JUMPSCOUT.bt_export,false)
-  end
-  if getv(JUMPSCOUT.bt_import,false) then
-    local t = cfg_parse(get_clip())
-    if t then cfg_apply(t) end
-    setv(JUMPSCOUT.bt_import,false)
-  end
-  if getv(JUMPSCOUT.bt_reset,false) then
-    cfg_apply({maxdz=22,ghc=68,gmd=50,gps=60,ahc=35,amd=16,aps=30,hyst=20,ease=70,smooth=35,enable=false,force=false})
-    setv(JUMPSCOUT.bt_reset,false)
-  end
-end)
 
 
 M.movement_combo = gui.combo_box(gui.control_id("movement_features"))
@@ -1339,7 +1266,7 @@ M.watermark_text_input = gui.text_input(gui.control_id("watermark_custom_text"))
 M.watermark_text_input.placeholder = "custom watermark text"
 M.watermark_text_input:set_value(M.watermark_custom_text) 
 
-M.watermark_text_wrapper = gui.make_control("moon Txt", M.watermark_text_input)
+M.watermark_text_wrapper = gui.make_control("Moonware Txt", M.watermark_text_input)
 M.main.groupb:add(M.watermark_text_wrapper)
 smart_reset("groupb")
 
@@ -1485,12 +1412,12 @@ local remove_dormant_wrapper = gui.make_control("Remove Moon Stable", M.remove_d
 M.main.groupb:add(remove_dormant_wrapper)
 M.remove_dormant_wrapper = remove_dormant_wrapper 
 
-M.million_text_input = gui.text_input(gui.control_id("million_text"))
-M.million_text_input.placeholder = "Enter moon text..."
-M.million_text_input:set_value(M.indicators.crosshair.custom_million_text) 
+M.Moon_text_input = gui.text_input(gui.control_id("Moon_text"))
+M.Moon_text_input.placeholder = "Enter moon text..."
+M.Moon_text_input:set_value(M.indicators.crosshair.custom_Moon_text) 
 
-M.million_text_wrapper = gui.make_control("Million Text", M.million_text_input)
-M.main.groupb:add(M.million_text_wrapper)
+M.Moon_text_wrapper = gui.make_control("Moon Text", M.Moon_text_input)
+M.main.groupb:add(M.Moon_text_wrapper)
 smart_reset("groupb")
 
 M.stable_text_input = gui.text_input(gui.control_id("stable_text"))
@@ -1526,9 +1453,9 @@ M.indicator_style_wrapper = gui.make_control("Indicator Style", M.indicator_styl
 M.main.groupb:add(M.indicator_style_wrapper)
 smart_reset("groupb")
 
-function M.update_million_stable_text()
-    if M.million_text_input.value ~= "" then
-        M.indicators.crosshair.custom_million_text = M.million_text_input.value
+function M.update_Moon_stable_text()
+    if M.Moon_text_input.value ~= "" then
+        M.indicators.crosshair.custom_Moon_text = M.Moon_text_input.value
     end
 
     if M.stable_text_input.value ~= "" then
@@ -1536,7 +1463,7 @@ function M.update_million_stable_text()
     end
 end
 
-events.present_queue:add(M.update_million_stable_text)
+events.present_queue:add(M.update_Moon_stable_text)
 
 M.damage_numbers_color = gui.color_picker(gui.control_id("Damage Numbers Color"))
 M.damage_numbers_color:get_value():set(draw.color(255, 255, 255, 255))
@@ -1772,9 +1699,9 @@ function M.comprehensive_update()
         M.remove_dormant_wrapper:set_visible(crosshair_indicators_visible)
     end
 
-    if M.million_text_wrapper then
+    if M.Moon_text_wrapper then
         local crosshair_indicators_visible = type(indicators_value) == "number" and bit.band(indicators_value, 2) ~= 0
-        M.million_text_wrapper:set_visible(crosshair_indicators_visible)
+        M.Moon_text_wrapper:set_visible(crosshair_indicators_visible)
     end
 
     if M.stable_text_wrapper then
@@ -2387,7 +2314,7 @@ function M.render_bottom_watermark()
 
     draw.surface.font = draw.fonts["gui_main"]
 
-    local letters = {"M", "O", "O", "N"}
+    local letters = {"Moon"}
 
     local total_width = 0
     for _, letter in ipairs(letters) do
@@ -2438,7 +2365,7 @@ function M.render_bottom_watermark()
         white_color
     )
 
-    local status_letters = {"D", "E", "V"}
+    local status_letters = {"stable"}
 
     local status_width = 0
     for _, letter in ipairs(status_letters) do
@@ -2495,7 +2422,7 @@ function M.render_legit_indicators()
     local d = draw.surface
     d.font = draw.fonts["gui_bold"]
 
-    local moon_controls = {
+    local Moonware_controls = {
         {name = "jb", display = "JB", context = "misc>movement>jumpbug", bit = 1},
         {name = "ej", display = "EJ", context = "misc>movement>edge jump", bit = 2},
         {name = "tb", display = "TB", context = "legit>weapon>general>trigger>triggerbot", bit = 4}
@@ -2509,7 +2436,7 @@ function M.render_legit_indicators()
     local accent_color = M.accent_picker:get_value():get()
 
     local active_indicators = {}
-    for _, control in ipairs(moon_controls) do
+    for _, control in ipairs(Moonware_controls) do
 
         if bit.band(selected_features, control.bit) ~= 0 then
             local context = gui.ctx:find(control.context)
@@ -2641,447 +2568,496 @@ for _, data in ipairs({
 end
 
 function M.render_crosshair_indicators()
-    -- === early-outs / guards ===
-    if not M or not M.indicators_combo then return end
-
-    -- tiny helpers to avoid nils with bit.band
-    local function btest(v, m)
-        v = tonumber(v) or 0
-        m = tonumber(m) or 0
-        return bit.band(v, m) ~= 0
-    end
-
-    -- safe raw getter for combos (returns number)
-    local function combo_raw_safe(combo, def)
-        if not combo or not combo.get_value then return def or 0 end
-        local vr = combo:get_value()
-        if not (vr and vr.get and type(vr.get) == "function") then return def or 0 end
-        local got = vr:get()
-        if got and got.get_raw and type(got.get_raw) == "function" then
-            local raw = got:get_raw()
-            if type(raw) == "number" then return raw end
-        end
-        return def or 0
-    end
-
-    -- guard feature toggles
-    local cv_raw = combo_raw_safe(M.indicators_combo, 0)
-    if not btest(cv_raw, 2) then
+    local combo_value = M.indicators_combo:get_value():get():get_raw()
+    if type(combo_value) ~= "number" or bit.band(combo_value, 2) == 0 then
         return
     end
 
-    -- selected per-feature flags for crosshair list
-    local selected_features = combo_raw_safe(M.crosshair_indicator_controls_combo, 0)
+    local selected_features = M.crosshair_indicator_controls_combo:get_value():get():get_raw()
+    if type(selected_features) ~= "number" then return end
 
-    -- lazy init containers to avoid nil math/indexing
-    M.indicators                   = M.indicators or {}
-    M.indicators.crosshair         = M.indicators.crosshair or {}
-    local XH                       = M.indicators.crosshair
-    XH.stable_alpha                = XH.stable_alpha or 180
-    XH.stable_fade_dir             = XH.stable_fade_dir or 1
-    XH.wave_position               = XH.wave_position or 0
-    XH.wave_speed                  = XH.wave_speed or 85
-    XH.glitch_last_update          = XH.glitch_last_update or 0
-    XH.glitch_chars                = XH.glitch_chars or {}
-    XH.glitch_active               = XH.glitch_active or false
-    XH.typewriter_start            = XH.typewriter_start or 0
-    XH.typewriter_pos              = XH.typewriter_pos or 0
-    XH.typewriter_phase            = XH.typewriter_phase or "typing"
-    XH.movement_alpha              = XH.movement_alpha or 255
-    XH.current_text                = XH.current_text or "« Standing »"
-    M.current_x_offset             = M.current_x_offset or 0
-
-    -- drawing/screen
+    local sw, sh = M.screen[1], M.screen[2]
+    local pos_x, pos_y = sw / 2, sh / 2
     local d = draw.surface
-    d.font = draw.fonts["gui_debug"] or d.font
-    local sw = (M.screen and M.screen[1]) or 1920
-    local sh = (M.screen and M.screen[2]) or 1080
-    local pos_x, pos_y = sw * 0.5, sh * 0.5
+    d.font = draw.fonts["gui_debug"]
 
-    -- fallback outlined text if M.draw_outlined_text missing
-    local function draw_outlined_text(surface, x, y, text, col_fg, a_override)
-        local a = (a_override ~= nil) and a_override or (col_fg.a or 255)
-        for ox = -1, 1 do
-            for oy = -1, 1 do
-                if ox ~= 0 or oy ~= 0 then
-                    surface:add_text(draw.vec2(x + ox, y + oy), text, draw.color(0, 0, 0, a))
-                end
-            end
-        end
-        surface:add_text(draw.vec2(x, y), text, draw.color(col_fg.r, col_fg.g, col_fg.b, a))
-    end
-    local draw_outlined = M.draw_outlined_text or draw_outlined_text
-
-    -- player / weapon context
     local local_pawn = entities.get_local_pawn()
     if not local_pawn then return end
-    local is_scoped     = local_pawn.m_bIsScoped and local_pawn.m_bIsScoped:get()
-    local active_weapon = local_pawn:get_active_weapon()
-    local wid = active_weapon and active_weapon.get_id and active_weapon:get_id() or -1
-    local is_sniper = (wid == (weapon_id and weapon_id.awp or -1))
-                   or (wid == (weapon_id and weapon_id.ssg08 or -1))
-                   or (wid == (weapon_id and weapon_id.scar20 or -1))
-                   or (wid == (weapon_id and weapon_id.g3sg1 or -1))
 
-    -- smooth offset when scoped with sniper
-    local frame_time = (game.global_vars and game.global_vars.frame_time) or 0.015
+    local is_scoped = local_pawn.m_bIsScoped and local_pawn.m_bIsScoped:get()
+    local active_weapon = local_pawn:get_active_weapon()
+    local is_sniper = active_weapon and (
+        active_weapon:get_id() == weapon_id.awp or 
+        active_weapon:get_id() == weapon_id.ssg08 or 
+        active_weapon:get_id() == weapon_id.scar20 or 
+        active_weapon:get_id() == weapon_id.g3sg1
+    )
+
     local target_x_offset = (is_scoped and is_sniper) and 75 or 0
+    local frame_time = game.global_vars.frame_time
+    M.current_x_offset = M.current_x_offset or 0
     M.current_x_offset = M.current_x_offset + ((target_x_offset - M.current_x_offset) * frame_time * 8)
 
-    -- config / style
-    local accent = (M.accent_picker and M.accent_picker:get_value() and M.accent_picker:get_value():get()) or draw.color(255, 120, 20, 255)
-    local y_pos  = pos_y + 25
+    local accent_color = M.accent_picker:get_value():get()
 
-    -- skip “dormant” removal if user enabled it
-    local remove_dormant = (M.remove_dormant_checkbox and M.remove_dormant_checkbox:get_value() and M.remove_dormant_checkbox:get_value():get()) or false
+    local y_pos = pos_y + 25
 
-    -- texts (avoid undefined globals)
-    local million_text = (M.indicators and M.indicators.crosshair and M.indicators.crosshair.custom_million_text) or "MILLION"
-    local stable_text  = (M.indicators and M.indicators.crosshair and M.indicators.crosshair.custom_stable_text)  or "STABLE"
+    if not M.remove_dormant_checkbox:get_value():get() then
+        local Moon_text = M.indicators.crosshair.custom_Moon_text
+        local stable_text = M.indicators.crosshair.custom_stable_text
 
-    -- width calcs
-    local million_w  = d.font:get_text_size(million_text).x
-    local stable_w   = d.font:get_text_size(stable_text).x
-    local space_w    = d.font:get_text_size(" ").x
-    local total_w    = million_w + space_w + stable_w
-    local start_x    = pos_x - (total_w * 0.5) + M.current_x_offset
+        local Moon_width = d.font:get_text_size(Moon_text).x
+        local stable_width = d.font:get_text_size(stable_text).x
+        local space_width = d.font:get_text_size(" ").x
+        local total_width = Moon_width + space_width + stable_width
+        local start_x = pos_x - (total_width / 2) + M.current_x_offset
 
-    -- which crosshair style
-    local style_value = combo_raw_safe(M.indicator_style_combo, 1)
+        local style_value = M.indicator_style_combo:get_value():get():get_raw()
+        if type(style_value) ~= "number" then style_value = 1 end
 
-    -- helpers
-    local function draw_shadow_text(x, y, text, col_fg)
-        for ox = -1, 1 do
-            for oy = -1, 1 do
-                if ox ~= 0 or oy ~= 0 then
-                    d:add_text(draw.vec2(x + ox, y + oy), text, draw.color(0, 0, 0, 255))
+        if bit.band(style_value, 1) ~= 0 then
+
+            M.draw_outlined_text(d, start_x, y_pos, Moon_text, draw.color(255, 255, 255, 255), 255)
+
+            M.indicators.crosshair.stable_alpha = M.indicators.crosshair.stable_alpha + (frame_time * 255 * 1.5 * M.indicators.crosshair.stable_fade_dir)
+            M.indicators.crosshair.stable_alpha = math.max(100, math.min(255, M.indicators.crosshair.stable_alpha))
+            if M.indicators.crosshair.stable_alpha == 255 or M.indicators.crosshair.stable_alpha == 100 then
+                M.indicators.crosshair.stable_fade_dir = -M.indicators.crosshair.stable_fade_dir
+            end
+
+            local stable_x = start_x + Moon_width + space_width
+
+            for i = 3, 1, -1 do
+                local glow_alpha = (15 - (i * 3)) * (M.indicators.crosshair.stable_alpha / 255)
+                for x = -i, i do
+                    for y = -i, i do
+                        d:add_text(draw.vec2(stable_x + x, y_pos + y), stable_text, draw.color(
+                            accent_color:get_r(),
+                            accent_color:get_g(),
+                            accent_color:get_b(),
+                            glow_alpha
+                        ))
+                    end
                 end
             end
-        end
-        d:add_text(draw.vec2(x, y), text, col_fg)
-    end
 
-    local function draw_glow_text(x, y, text, base_col, alpha_scale)
-        for i = 3, 1, -1 do
-            local glow_alpha = (15 - (i * 3)) * alpha_scale
-            for gx = -i, i do
-                for gy = -i, i do
-                    d:add_text(draw.vec2(x + gx, y + gy), text, draw.color(base_col:get_r(), base_col:get_g(), base_col:get_b(), glow_alpha))
-                end
-            end
-        end
-        d:add_text(draw.vec2(x, y), text, draw.color(base_col:get_r(), base_col:get_g(), base_col:get_b(), math.floor(255 * alpha_scale)))
-    end
+            d:add_text(
+                draw.vec2(stable_x, y_pos),
+                stable_text,
+                draw.color(accent_color:get_r(), accent_color:get_g(), accent_color:get_b(), M.indicators.crosshair.stable_alpha)
+            )
+        elseif bit.band(style_value, 2) ~= 0 then
 
-    -- ======= CROSSHAIR LABELS =======
-    if not remove_dormant then
-        if btest(style_value, 1) then
-            -- simple + pulsating stable
-            draw_shadow_text(start_x, y_pos, million_text, draw.color(255, 255, 255, 255))
-            XH.stable_alpha = XH.stable_alpha + (frame_time * 255 * 1.5 * XH.stable_fade_dir)
-            XH.stable_alpha = math.max(100, math.min(255, XH.stable_alpha))
-            if XH.stable_alpha == 255 or XH.stable_alpha == 100 then
-                XH.stable_fade_dir = -XH.stable_fade_dir
-            end
-            local stable_x = start_x + million_w + space_w
-            draw_glow_text(stable_x, y_pos, stable_text, accent, XH.stable_alpha / 255)
+            M.indicators.crosshair.wave_position = (M.indicators.crosshair.wave_position + frame_time * M.indicators.crosshair.wave_speed) % (total_width * 1.5)
 
-        elseif btest(style_value, 2) then
-            -- white→accent wave
-            XH.wave_position = (XH.wave_position + frame_time * XH.wave_speed) % (total_w * 1.5)
             local cursor_x = start_x
-            local combined = million_text .. " " .. stable_text
-            local wave_w = 45
-            for i = 1, #combined do
-                local ch = combined:sub(i, i)
-                local cw = d.font:get_text_size(ch).x
-                local wave_center = start_x + XH.wave_position - (total_w * 0.25)
-                local dist = math.abs(cursor_x - wave_center)
-                local col
-                if dist < wave_w then
-                    local f = 1 - (dist / wave_w); f = f * f
-                    col = draw.color(
-                        math.floor(255 * (1 - f) + accent:get_r() * f),
-                        math.floor(255 * (1 - f) + accent:get_g() * f),
-                        math.floor(255 * (1 - f) + accent:get_b() * f),
+            local combined_text = Moon_text .. " " .. stable_text
+            local wave_width = 45
+
+            for i = 1, combined_text:len() do
+                local char = combined_text:sub(i, i)
+                local char_width = d.font:get_text_size(char).x
+
+                local wave_center = start_x + M.indicators.crosshair.wave_position - (total_width * 0.25)
+                local dist_from_wave = math.abs(cursor_x - wave_center)
+
+                local char_color
+                if dist_from_wave < wave_width then
+                    local factor = 1 - (dist_from_wave / wave_width)
+                    factor = factor * factor
+
+                    char_color = draw.color(
+                        math.floor(255 * (1 - factor) + accent_color:get_r() * factor),
+                        math.floor(255 * (1 - factor) + accent_color:get_g() * factor),
+                        math.floor(255 * (1 - factor) + accent_color:get_b() * factor),
                         255
                     )
                 else
-                    col = draw.color(255, 255, 255, 255)
+                    char_color = draw.color(255, 255, 255, 255)
                 end
-                draw_shadow_text(cursor_x, y_pos, ch, col)
-                cursor_x = cursor_x + cw
-            end
 
-        elseif btest(style_value, 4) then
-            -- rainbow wave
-            XH.wave_position = (XH.wave_position + frame_time * XH.wave_speed) % (total_w * 1.5)
+                for ox = -1, 1 do
+                    for oy = -1, 1 do
+                        if ox ~= 0 or oy ~= 0 then
+                            d:add_text(draw.vec2(cursor_x + ox, y_pos + oy), char, draw.color(0, 0, 0, 255))
+                        end
+                    end
+                end
+
+                d:add_text(draw.vec2(cursor_x, y_pos), char, char_color)
+                cursor_x = cursor_x + char_width
+            end
+        elseif bit.band(style_value, 4) ~= 0 then
+
+            M.indicators.crosshair.wave_position = (M.indicators.crosshair.wave_position + frame_time * M.indicators.crosshair.wave_speed) % (total_width * 1.5)
+
             local cursor_x = start_x
-            local combined = million_text .. " " .. stable_text
-            local wave_w = 45
-            local t = ((game.global_vars and game.global_vars.real_time) or 0) * 0.5
-            for i = 1, #combined do
-                local ch = combined:sub(i, i)
-                local cw = d.font:get_text_size(ch).x
-                local wave_center = start_x + XH.wave_position - (total_w * 0.25)
-                local dist = math.abs(cursor_x - wave_center)
-                local col
-                if dist < wave_w then
-                    local f = 1 - (dist / wave_w); f = f * f
-                    local hue = (((cursor_x / 100) + t) % 1.0)
+            local combined_text = Moon_text .. " " .. stable_text
+            local wave_width = 45
+            local time = game.global_vars.real_time * 0.5
+
+            for i = 1, combined_text:len() do
+                local char = combined_text:sub(i, i)
+                local char_width = d.font:get_text_size(char).x
+
+                local wave_center = start_x + M.indicators.crosshair.wave_position - (total_width * 0.25)
+                local dist_from_wave = math.abs(cursor_x - wave_center)
+
+                local char_color
+                if dist_from_wave < wave_width then
+                    local factor = 1 - (dist_from_wave / wave_width)
+                    factor = factor * factor
+
+                    local hue = (((cursor_x / 100) + time) % 1.0)
+                    local r, g, b
+
                     local h = hue * 6
-                    local ii = math.floor(h)
-                    local ff = h - ii
-                    local q = 1 - ff
-                    local r,g,b
-                    if ii == 0 then r,g,b = 1, ff, 0
-                    elseif ii == 1 then r,g,b = q, 1, 0
-                    elseif ii == 2 then r,g,b = 0, 1, ff
-                    elseif ii == 3 then r,g,b = 0, q, 1
-                    elseif ii == 4 then r,g,b = ff, 0, 1
-                    else r,g,b = 1, 0, q end
-                    col = draw.color(
-                        math.floor(255 * (1 - f) + r * 255 * f),
-                        math.floor(255 * (1 - f) + g * 255 * f),
-                        math.floor(255 * (1 - f) + b * 255 * f),
+                    local i = math.floor(h)
+                    local f = h - i
+                    local p = 0
+                    local q = 1 - f
+                    local t = f
+
+                    if i == 0 then r, g, b = 1, t, 0
+                    elseif i == 1 then r, g, b = q, 1, 0
+                    elseif i == 2 then r, g, b = 0, 1, t
+                    elseif i == 3 then r, g, b = 0, q, 1
+                    elseif i == 4 then r, g, b = t, 0, 1
+                    else r, g, b = 1, 0, q end
+
+                    char_color = draw.color(
+                        math.floor(255 * (1 - factor) + r * 255 * factor),
+                        math.floor(255 * (1 - factor) + g * 255 * factor),
+                        math.floor(255 * (1 - factor) + b * 255 * factor),
                         255
                     )
                 else
-                    col = draw.color(255, 255, 255, 255)
+                    char_color = draw.color(255, 255, 255, 255)
                 end
-                draw_shadow_text(cursor_x, y_pos, ch, col)
-                cursor_x = cursor_x + cw
-            end
 
-        elseif btest(style_value, 8) then
-            -- bounce + pulse color
-            local t = ((game.global_vars and game.global_vars.real_time) or 0) * 4
+                for ox = -1, 1 do
+                    for oy = -1, 1 do
+                        if ox ~= 0 or oy ~= 0 then
+                            d:add_text(draw.vec2(cursor_x + ox, y_pos + oy), char, draw.color(0, 0, 0, 255))
+                        end
+                    end
+                end
+
+                d:add_text(draw.vec2(cursor_x, y_pos), char, char_color)
+                cursor_x = cursor_x + char_width
+            end
+        elseif bit.band(style_value, 8) ~= 0 then
+
+            local time = game.global_vars.real_time * 4
             local cursor_x = start_x
-            local combined = million_text .. " " .. stable_text
-            for i = 1, #combined do
-                local ch = combined:sub(i, i)
-                local cw = d.font:get_text_size(ch).x
-                local bounce = math.sin(((cursor_x / 15) + t) % (2 * math.pi)) * 3
-                local cf = (math.sin(((cursor_x / 25) + t)) + 1) * 0.5
-                local col = draw.color(
-                    math.floor(255 * (1 - cf) + accent:get_r() * cf),
-                    math.floor(255 * (1 - cf) + accent:get_g() * cf),
-                    math.floor(255 * (1 - cf) + accent:get_b() * cf),
+            local combined_text = Moon_text .. " " .. stable_text
+
+            for i = 1, combined_text:len() do
+                local char = combined_text:sub(i, i)
+                local char_width = d.font:get_text_size(char).x
+
+                local bounce_phase = ((cursor_x / 15) + time) % (2 * math.pi)
+                local bounce_offset = math.sin(bounce_phase) * 3
+
+                local color_phase = ((cursor_x / 25) + time) % (2 * math.pi)
+                local color_factor = (math.sin(color_phase) + 1) / 2
+
+                local char_color = draw.color(
+                    math.floor(255 * (1 - color_factor) + accent_color:get_r() * color_factor),
+                    math.floor(255 * (1 - color_factor) + accent_color:get_g() * color_factor),
+                    math.floor(255 * (1 - color_factor) + accent_color:get_b() * color_factor),
                     255
                 )
-                draw_shadow_text(cursor_x, y_pos + bounce, ch, col)
-                cursor_x = cursor_x + cw
+
+                for ox = -1, 1 do
+                    for oy = -1, 1 do
+                        if ox ~= 0 or oy ~= 0 then
+                            d:add_text(draw.vec2(cursor_x + ox, y_pos + bounce_offset + oy), char, draw.color(0, 0, 0, 255))
+                        end
+                    end
+                end
+
+                d:add_text(draw.vec2(cursor_x, y_pos + bounce_offset), char, char_color)
+                cursor_x = cursor_x + char_width
+            end
+        elseif bit.band(style_value, 16) ~= 0 then
+
+            if not M.indicators.crosshair.glitch_last_update then
+                M.indicators.crosshair.glitch_last_update = game.global_vars.real_time
+                M.indicators.crosshair.glitch_chars = {}
+                M.indicators.crosshair.glitch_active = false
             end
 
-        elseif btest(style_value, 16) then
-            -- glitch
-            local rt = (game.global_vars and game.global_vars.real_time) or 0
+            local time = game.global_vars.real_time
             local cursor_x = start_x
-            local combined = million_text .. " " .. stable_text
-            local interval = XH.glitch_active and 0.1 or 0.3
-            if rt - XH.glitch_last_update > interval then
-                XH.glitch_last_update = rt
-                XH.glitch_active = not XH.glitch_active
-                XH.glitch_chars = {}
-                for i = 1, #combined do
-                    XH.glitch_chars[i] = {
+            local combined_text = Moon_text .. " " .. stable_text
+
+            if time - M.indicators.crosshair.glitch_last_update > (M.indicators.crosshair.glitch_active and 0.1 or 0.3) then
+                M.indicators.crosshair.glitch_last_update = time
+                M.indicators.crosshair.glitch_active = not M.indicators.crosshair.glitch_active
+
+                M.indicators.crosshair.glitch_chars = {}
+                for i = 1, combined_text:len() do
+                    M.indicators.crosshair.glitch_chars[i] = {
                         x_offset = (math.random() * 8 - 4),
                         y_offset = (math.random() * 6 - 3),
                         use_accent = math.random() < 0.5,
-                        hide = math.random() < 0.15
+                        hide = math.random() < 0.15, 
+                        delay = math.random() * 0.05 
                     }
                 end
             end
-            for i = 1, #combined do
-                local ch = combined:sub(i, i)
-                local cw = d.font:get_text_size(ch).x
-                local gd = XH.glitch_chars[i] or { x_offset = 0, y_offset = 0, use_accent = false, hide = false }
-                if not (XH.glitch_active and gd.hide) then
-                    local col = (XH.glitch_active and gd.use_accent) and accent or draw.color(255,255,255,255)
-                    draw_shadow_text(cursor_x + (XH.glitch_active and gd.x_offset or 0),
-                                     y_pos  + (XH.glitch_active and gd.y_offset or 0),
-                                     ch, col)
+
+            for i = 1, combined_text:len() do
+                local char = combined_text:sub(i, i)
+                local char_width = d.font:get_text_size(char).x
+
+                local glitch_data = M.indicators.crosshair.glitch_chars[i] or {
+                    x_offset = 0, 
+                    y_offset = 0, 
+                    use_accent = false,
+                    hide = false,
+                    delay = 0
+                }
+
+                local x_offset = M.indicators.crosshair.glitch_active and glitch_data.x_offset or 0
+                local y_offset = M.indicators.crosshair.glitch_active and glitch_data.y_offset or 0
+
+                if not (M.indicators.crosshair.glitch_active and glitch_data.hide) then
+
+                    local char_color
+                    if M.indicators.crosshair.glitch_active and glitch_data.use_accent then
+                        char_color = accent_color
+                    else
+                        char_color = draw.color(255, 255, 255, 255)
+                    end
+
+                    for ox = -1, 1 do
+                        for oy = -1, 1 do
+                            if ox ~= 0 or oy ~= 0 then
+                                d:add_text(draw.vec2(cursor_x + x_offset + ox, y_pos + y_offset + oy), char, draw.color(0, 0, 0, 255))
+                            end
+                        end
+                    end
+
+                    d:add_text(draw.vec2(cursor_x + x_offset, y_pos + y_offset), char, char_color)
                 end
-                cursor_x = cursor_x + cw
+
+                cursor_x = cursor_x + char_width
+            end
+        elseif bit.band(style_value, 32) ~= 0 then
+
+            if not M.indicators.crosshair.typewriter_start then
+                M.indicators.crosshair.typewriter_start = game.global_vars.real_time
+                M.indicators.crosshair.typewriter_pos = 0
+                M.indicators.crosshair.typewriter_phase = "typing"
             end
 
-        elseif btest(style_value, 32) then
-            -- typewriter
-            if XH.typewriter_start == 0 then
-                XH.typewriter_start = (game.global_vars and game.global_vars.real_time) or 0
-                XH.typewriter_pos   = 0
-                XH.typewriter_phase = "typing"
-            end
-            local rt = (game.global_vars and game.global_vars.real_time) or 0
+            local time = game.global_vars.real_time
             local cursor_x = start_x
-            local combined = million_text .. " " .. stable_text
-            local n = #combined
-            local cps = 15
-            local pause = 1.5
-            local elapsed = rt - XH.typewriter_start
-            if XH.typewriter_phase == "typing" then
-                XH.typewriter_pos = math.floor(elapsed * cps)
-                if XH.typewriter_pos >= n then
-                    XH.typewriter_pos = n
-                    XH.typewriter_phase = "pause"
-                    XH.typewriter_start = rt
+            local combined_text = Moon_text .. " " .. stable_text
+            local text_length = combined_text:len()
+
+            local chars_per_second = 15
+            local pause_duration = 1.5  
+            local elapsed = time - M.indicators.crosshair.typewriter_start
+
+            if M.indicators.crosshair.typewriter_phase == "typing" then
+
+                M.indicators.crosshair.typewriter_pos = math.floor(elapsed * chars_per_second)
+
+                if M.indicators.crosshair.typewriter_pos >= text_length then
+                    M.indicators.crosshair.typewriter_pos = text_length
+                    M.indicators.crosshair.typewriter_phase = "pause"
+                    M.indicators.crosshair.typewriter_start = time
                 end
-            elseif XH.typewriter_phase == "pause" then
-                if elapsed >= pause then
-                    XH.typewriter_phase = "deleting"
-                    XH.typewriter_start = rt
+            elseif M.indicators.crosshair.typewriter_phase == "pause" then
+
+                if elapsed >= pause_duration then
+                    M.indicators.crosshair.typewriter_phase = "deleting"
+                    M.indicators.crosshair.typewriter_start = time
                 end
-            else -- deleting
-                XH.typewriter_pos = n - math.floor(elapsed * cps)
-                if XH.typewriter_pos <= 0 then
-                    XH.typewriter_pos = 0
-                    XH.typewriter_phase = "typing"
-                    XH.typewriter_start = rt
+            elseif M.indicators.crosshair.typewriter_phase == "deleting" then
+
+                M.indicators.crosshair.typewriter_pos = text_length - math.floor(elapsed * chars_per_second)
+
+                if M.indicators.crosshair.typewriter_pos <= 0 then
+                    M.indicators.crosshair.typewriter_pos = 0
+                    M.indicators.crosshair.typewriter_phase = "typing"
+                    M.indicators.crosshair.typewriter_start = time
                 end
             end
-            XH.typewriter_pos = math.max(0, math.min(n, XH.typewriter_pos))
-            for i = 1, n do
-                local ch = combined:sub(i, i)
-                local cw = d.font:get_text_size(ch).x
-                if i <= XH.typewriter_pos then
-                    local col = (i <= #million_text) and draw.color(255,255,255,255) or accent
-                    draw_shadow_text(cursor_x, y_pos, ch, col)
+
+            M.indicators.crosshair.typewriter_pos = math.max(0, math.min(text_length, M.indicators.crosshair.typewriter_pos))
+
+            for i = 1, combined_text:len() do
+                local char = combined_text:sub(i, i)
+                local char_width = d.font:get_text_size(char).x
+
+                if i <= M.indicators.crosshair.typewriter_pos then
+
+                    local char_color
+                    if i <= Moon_text:len() then
+
+                        char_color = draw.color(255, 255, 255, 255)
+                    else
+
+                        char_color = accent_color
+                    end
+
+                    for ox = -1, 1 do
+                        for oy = -1, 1 do
+                            if ox ~= 0 or oy ~= 0 then
+                                d:add_text(draw.vec2(cursor_x + ox, y_pos + oy), char, draw.color(0, 0, 0, 255))
+                            end
+                        end
+                    end
+
+                    d:add_text(draw.vec2(cursor_x, y_pos), char, char_color)
                 end
-                cursor_x = cursor_x + cw
+
+                cursor_x = cursor_x + char_width
             end
-            -- blinking caret
-            local caret_x = start_x
-            for i = 1, XH.typewriter_pos do
-                local ch = combined:sub(i, i)
-                caret_x = caret_x + d.font:get_text_size(ch).x
+
+            local cursor_display_x = start_x
+
+            for i = 1, M.indicators.crosshair.typewriter_pos do
+                if i <= combined_text:len() then
+                    local char = combined_text:sub(i, i)
+                    cursor_display_x = cursor_display_x + d.font:get_text_size(char).x
+                end
             end
-            if XH.typewriter_phase ~= "pause" and (math.floor(rt * 2) % 2 == 0) then
-                local h = d.font:get_text_size("A").y
-                d:add_rect_filled(draw.rect(caret_x + 1, y_pos, caret_x + 3, y_pos + h), accent)
+
+            if M.indicators.crosshair.typewriter_phase ~= "pause" and (math.floor(time * 2) % 2 == 0) then
+                d:add_rect_filled(
+                    draw.rect(cursor_display_x + 1, y_pos, cursor_display_x + 3, y_pos + d.font:get_text_size("A").y),
+                    accent_color
+                )
             end
         end
     end
 
-    -- ======= STATUS LINE =======
-    local last_pos = XH.last_pos
-    local cur_pos  = local_pawn:get_abs_origin()
+    local current_pos = (local_pawn and local_pawn.get_abs_origin) and local_pawn:get_abs_origin() or nil
     local velocity = 0
-    if last_pos and cur_pos then
-        local dx, dy = cur_pos.x - last_pos.x, cur_pos.y - last_pos.y
-        velocity = math.sqrt(dx * dx + dy * dy) / (frame_time > 0 and frame_time or 1)
+    if M.indicators.crosshair.last_pos and current_pos then
+        local dx, dy = current_pos.x - M.indicators.crosshair.last_pos.x, current_pos.y - M.indicators.crosshair.last_pos.y
+        velocity = math.sqrt(dx * dx + dy * dy) / frame_time
     end
-    XH.last_pos = cur_pos
+    M.indicators.crosshair.last_pos = current_pos
 
-    local remove_status = (M.remove_status_checkbox and M.remove_status_checkbox:get_value() and M.remove_status_checkbox:get_value():get()) or false
-    if not remove_status then
+    if not M.remove_status_checkbox:get_value():get() then
         local state_text = ""
-
         if not game.engine:in_game() then
             state_text = "« Idle »"
-        elseif not local_pawn:is_alive() then
-            state_text = "« Dead »"
-        else
-            -- sandbox-friendly accessors (no pcall)
-            local function ctrl_bool(path)
-                local c = gui.ctx:find(path)
-                if not c then return false end
-                local v = c.get_value and c:get_value() or c
-                if v and v.get and type(v.get) == "function" then
-                    local res = v:get()
-                    return res == true or res == 1
-                end
-                return false
-            end
-            local function ctrl_number(path, def)
-                local c = gui.ctx:find(path)
-                if not c then return def or 0 end
-                local v = c.get_value and c:get_value() or c
-                if v and v.get and type(v.get) == "function" then
-                    local res = v:get()
-                    if type(res) == "number" then return res end
-                end
-                return def or 0
-            end
-
-            local aa_on         = ctrl_bool("rage>anti-aim>angles>anti-aim")
-            local slowwalk_on   = ctrl_bool("misc>movement>slowwalk")
-            local fakeduck_on   = ctrl_bool("misc>aimbot>general>duck peek assist")
-            local slowwalk_spd  = ctrl_number("misc>movement>slowwalk speed", 0)
-            local peekassist_on = ctrl_bool("misc>movement>peek assist")
-            local retreat_on    = ctrl_bool("misc>movement>retreat on release")
-            local is_e_pressed  = gui.input:is_key_down(0x45)
-
-            if slowwalk_on then
-                state_text = string.format("« Slow Walk(%d) »", math.floor(slowwalk_spd))
-            elseif aa_on and is_e_pressed then
-                state_text = "« Legit AA »"
-            elseif fakeduck_on then
-                state_text = "« Fake Ducking »"
-            elseif peekassist_on and not retreat_on then
-                state_text = "« Peek Assist »"
-            elseif peekassist_on and retreat_on then
-                state_text = "« Peek Assist(retreat) »"
+        elseif local_pawn then
+            if not local_pawn:is_alive() then
+                state_text = "« Dead »"
             else
-                local is_crouching     = gui.input:is_key_down(0x11)
-                local is_shift_walking = gui.input:is_key_down(0x10)
-                local flags            = (local_pawn.m_fFlags and local_pawn.m_fFlags:get()) or 0
-                local is_in_air        = bit.band(flags or 0, 1) == 0
-                if is_in_air then
-                    state_text = is_crouching and "« Air+Crouching »" or "« In Air »"
+                local anti_aim_context = gui.ctx:find("rage>anti-aim>angles>anti-aim")
+                local slowwalk_context = gui.ctx:find("misc>movement>slowwalk")
+                local fakeduck_context = gui.ctx:find("misc>aimbot>general>duck peek assist")
+                local slowwalk_speed_context = gui.ctx:find("misc>movement>slowwalk speed")
+                local peekassist_context = gui.ctx:find("misc>movement>peek assist")
+                local peekassistretreat_context = gui.ctx:find("misc>movement>retreat on release")
+                local is_e_pressed = gui.input:is_key_down(0x45)
+                local gamerelated_context = M.game_related_combo:get_value():get():get_raw()
+
+                -- nil-safe reads for peek assist + retreat
+                local function ctx_on(c)
+                    local v = c and c.get_value and c:get_value()
+                    return v and v.get and v:get() or false
+                end
+                local peekassist_on = ctx_on(peekassist_context)
+                local retreat_on    = ctx_on(peekassistretreat_context)
+
+                if slowwalk_context and slowwalk_context:get_value():get() then
+                    local slowwalk_speed = slowwalk_speed_context and slowwalk_speed_context:get_value():get() or 0
+                    state_text = string.format("« Slow Walk(%d) »", math.floor(slowwalk_speed))
+                elseif anti_aim_context and anti_aim_context:get_value():get() and is_e_pressed then
+                    state_text = "« Legit AA »"
+                elseif fakeduck_context and fakeduck_context:get_value():get() then
+                    state_text = "« Fake Ducking »"
+                elseif peekassist_on and not retreat_on then
+                    state_text = "« Peek Assist »"
+                elseif peekassist_on and retreat_on then
+                    state_text = "« Peek Assist(retreat) »"
+                elseif type(gamerelated_context) == "number" and bit.band(gamerelated_context, 1) ~= 0 then
+                    state_text = "« Anti-Afk »"
+
                 else
-                    if is_shift_walking then
-                        state_text = "« Sneaking »"
-                    elseif is_crouching then
-                        state_text = "« Crouching »"
-                    elseif velocity > 5 then
-                        state_text = "« Moving »"
+                    local is_crouching = gui.input:is_key_down(0x11)
+                    local is_shift_walking = gui.input:is_key_down(0x10)
+                    local flags = local_pawn.m_fFlags and local_pawn.m_fFlags:get() or 0
+                    local is_in_air = bit.band(flags, 1) == 0
+
+                    if is_in_air then
+                        state_text = is_crouching and "« Air+Crouching »" or "« In Air »"
                     else
-                        state_text = "« Standing »"
+                        if is_shift_walking then
+                            state_text = "« Sneaking »"
+                        elseif is_crouching then
+                            state_text = "« Crouching »"
+                        elseif velocity > 5 then
+                            state_text = "« Moving »"
+                        else
+                            state_text = "« Standing »"
+                        end
                     end
                 end
             end
         end
 
-        local new_text = state_text
-        XH.movement_alpha = (new_text ~= XH.current_text)
-            and math.max(0, (XH.movement_alpha or 255) - (frame_time * 255 * 255))
-            or  math.min(255, (XH.movement_alpha or 0) + (frame_time * 255 * 255))
 
-        if XH.movement_alpha == 0 then
-            XH.current_text = new_text
+
+        local new_text = state_text
+        M.indicators.crosshair.movement_alpha = new_text ~= M.indicators.crosshair.current_text and 
+            math.max(0, M.indicators.crosshair.movement_alpha - (frame_time * 255 * 255)) or 
+            math.min(255, M.indicators.crosshair.movement_alpha + (frame_time * 255 * 255))
+
+        if M.indicators.crosshair.movement_alpha == 0 then 
+            M.indicators.crosshair.current_text = new_text 
         end
 
-        local text_width = d.font:get_text_size(XH.current_text).x
-        draw_outlined(
-            d,
+        local text_width = d.font:get_text_size(M.indicators.crosshair.current_text).x
+        M.draw_outlined_text(
+            d, 
             pos_x - (text_width / 2) + M.current_x_offset,
             y_pos + 15,
-            XH.current_text,
-            draw.color(255, 255, 255, XH.movement_alpha),
-            XH.movement_alpha
+            M.indicators.crosshair.current_text,
+            draw.color(255, 255, 255, M.indicators.crosshair.movement_alpha),
+            M.indicators.crosshair.movement_alpha
         )
     end
 
-    -- ======= FEATURE LIST (example: mindamage) =======
-    local list_y = y_pos + 15
-    local rd = (M.remove_dormant_checkbox and M.remove_dormant_checkbox:get_value() and M.remove_dormant_checkbox:get_value():get()) or false
-    local rs = (M.remove_status_checkbox and M.remove_status_checkbox:get_value() and M.remove_status_checkbox:get_value():get()) or false
-    if not rd then list_y = list_y + 0 end
-    if not rs then list_y = list_y + 15 end
+    local active_features = {}
+    local animation_speed = 0.2
 
-    -- bit 1 = min damage indicator (only if you have these helpers)
-    if btest(selected_features, 1) and active_weapon and M.is_utility_weapon and M.get_mindamage_path then
+    local list_y = y_pos + 15  
+
+    if not M.remove_dormant_checkbox:get_value():get() then
+        list_y = list_y + 0  
+    end
+
+    if not M.remove_status_checkbox:get_value():get() then
+        list_y = list_y + 15  
+    end
+
+    if bit.band(selected_features, 1) ~= 0 and active_weapon then
         local weapon_id = active_weapon:get_id()
+
         if not M.is_utility_weapon(weapon_id) then
             local damage_path = M.get_mindamage_path(weapon_id)
+
             if damage_path then
                 local damage_context = gui.ctx:find(damage_path)
                 local override_context = gui.ctx:find("rage>aimbot>general>min damage>override")
                 local override_value_context = gui.ctx:find("rage>aimbot>general>min damage>override value")
+
                 if damage_context then
-                    local damage_value = (damage_context:get_value() and damage_context:get_value():get()) or 0
-                    local is_override = override_context and override_context:get_value() and override_context:get_value():get()
-                    local override_value = (override_value_context and override_value_context:get_value() and override_value_context:get_value():get()) or 0
+                    local damage_value = damage_context:get_value():get()
+                    local is_override = override_context and override_context:get_value():get()
+                    local override_value = override_value_context and override_value_context:get_value():get()
+
                     local function format_damage(value)
                         if value == 0 then
                             return "Lethal"
@@ -3103,18 +3079,15 @@ function M.render_crosshair_indicators()
                         is_override and " (override)" or ""
                     )
 
-                    active_features = active_features or {}
-
                     table.insert(active_features, {
-                        name     = text,
-                        alpha    = 1,
+                        name = text,
+                        alpha = 1,
                         y_offset = 0
                     })
                 end
             end
         end
     end
-
 
     if bit.band(selected_features, 2) ~= 0 and active_weapon then
         local weapon_id = active_weapon:get_id()
@@ -3223,32 +3196,22 @@ function M.render_crosshair_indicators()
         end
     end
 
-    -- ======= FEATURE LIST (safe) =======
-    -- Re-init as an empty table (never nil) so table.sort/ipairs are safe.
-    local active_features = {}
-
-    if #active_features > 1 then
-        table.sort(active_features, function(a, b)
-            return (a.y_offset or 0) < (b.y_offset or 0)
-        end)
-    end
+    table.sort(active_features, function(a, b)
+        return a.y_offset < b.y_offset
+    end)
 
     local spacing = 15
     for i, feature in ipairs(active_features) do
-        local name     = tostring(feature.name or "")
-        local y_off    = tonumber(feature.y_offset) or 0
-        local alpha_f  = tonumber(feature.alpha) or 1.0
-        local alpha    = math.max(0, math.min(255, math.floor(alpha_f * 255)))
-
-        local width    = d.font:get_text_size(name).x
-        local feature_y = list_y + (i - 1) * spacing + y_off
+        local width = d.font:get_text_size(feature.name).x
+        local feature_y = list_y + (i-1) * spacing + feature.y_offset
+        local alpha = math.floor(feature.alpha * 255)
 
         for ox = -1, 1 do
             for oy = -1, 1 do
                 if ox ~= 0 or oy ~= 0 then
                     d:add_text(
                         draw.vec2(pos_x - (width / 2) + M.current_x_offset + ox, feature_y + oy),
-                        name,
+                        feature.name,
                         draw.color(0, 0, 0, alpha)
                     )
                 end
@@ -3257,7 +3220,7 @@ function M.render_crosshair_indicators()
 
         d:add_text(
             draw.vec2(pos_x - (width / 2) + M.current_x_offset, feature_y),
-            name,
+            feature.name,
             draw.color(255, 255, 255, alpha)
         )
     end
@@ -3388,7 +3351,7 @@ function M.render_startup_animation()
     local letter_spacing = 5
 
     local total_width = 0
-    for _, letter in ipairs(M.startup_anim.letters_million) do
+    for _, letter in ipairs(M.startup_anim.letters_Moon) do
         total_width = total_width + draw.surface.font:get_text_size(letter).x + letter_spacing
     end
 
@@ -3396,7 +3359,7 @@ function M.render_startup_animation()
     local letter_delay = 0.1 
     local slide_duration = 0.3 
 
-    for i, letter in ipairs(M.startup_anim.letters_million) do
+    for i, letter in ipairs(M.startup_anim.letters_Moon) do
         local letter_start_time = 0.2 + (i-1) * letter_delay
         local letter_progress = math.max(0, math.min(1, (elapsed - letter_start_time) / slide_duration))
 
@@ -3433,14 +3396,14 @@ function M.render_startup_animation()
     end
 
     local total_text_width = 0
-    for _, letter in ipairs(M.startup_anim.letters_premium) do
+    for _, letter in ipairs(M.startup_anim.letters_supporter) do
         total_text_width = total_text_width + draw.surface.font:get_text_size(letter).x + letter_spacing
     end
 
     local text_x = center_x - (total_text_width / 2)
 
     local current_text_x = text_x
-    for i, letter in ipairs(M.startup_anim.letters_premium) do
+    for i, letter in ipairs(M.startup_anim.letters_supporter) do
         local letter_start_time = 0.8 + (i-1) * letter_delay 
         local letter_progress = math.max(0, math.min(1, (elapsed - letter_start_time) / slide_duration))
 
@@ -3477,7 +3440,7 @@ function M.render_startup_animation()
     end
 
     draw.surface.font = draw.fonts["gui_debug"]
-    local credit_text = "made by star"
+    local credit_text = "star"
     local credit_size = draw.surface.font:get_text_size(credit_text)
 
     local credit_y = center_y + 45
@@ -4675,7 +4638,7 @@ function M.render_gamesense_hitlog()
 end
 
 function M.show_notification(title, message)
-    local notif = gui.notification("Million.lua", message)
+    local notif = gui.notification("Moon", message)
     gui.notify:add(notif)
  end
  function M.on_nvidia_hurt(event)
@@ -4825,7 +4788,7 @@ end
          local message = string.format("Hit %s in the %s for %d damage (%d hp remaining)", 
              victim_name, hit_location, damage, health)
 
-         M.show_notification("Million.lua", message)
+         M.show_notification("Moon", message)
      end
  end
 
@@ -4861,7 +4824,7 @@ end
          local message = string.format("Hurt by %s in %s for %d damage (%d hp remaining)", 
              attacker_name, hit_location, damage, health)
 
-         M.show_notification("Million.lua", message)
+         M.show_notification("Moon", message)
      end
  end
 
@@ -5087,7 +5050,7 @@ end
             ) or damage
 
             local log_text = string.format(
-                "[Million.lua] Hit %s in %s for %d damage at %.1f units, (%d Remaining) Damage Falloff: %.1f%%, Penetration Power: %.2f",
+                "[Moon] Hit %s in %s for %d damage at %.1f units, (%d Remaining) Damage Falloff: %.1f%%, Penetration Power: %.2f",
                 victim_name,
                 hit_location,
                 damage,
@@ -5153,7 +5116,7 @@ end
             end
 
             local log_text = string.format(
-                "[Million.lua] Hurt by %s in %s for %d damage at %.1f units, (%d Remaining)",
+                "[Moon] Hurt by %s in %s for %d damage at %.1f units, (%d Remaining)",
                 attacker_name,
                 hit_location,
                 damage,
@@ -7849,7 +7812,7 @@ function M.on_game_stats_player_death(event)
             if streak >= 5 then
                 local attacker_name = attacker and attacker:get_name() or "Someone"
                 local message = string.format("%s ended %s's %d killstreak!", attacker_name, victim_name, streak)
-                local notif = gui.notification("Million.lua", message)
+                local notif = gui.notification("Moon", message)
                 gui.notify:add(notif)
             end
 
@@ -8641,7 +8604,7 @@ function M.handle_disconnect_on_end(event)
 
         M.disconnect_on_end.waiting_for_disconnect = true
 
-        local notif = gui.notification("Million.lua", string.format("Game ended. Disconnecting in %.1f seconds...", M.disconnect_on_end.disconnect_delay))
+        local notif = gui.notification("Moon", string.format("Game ended. Disconnecting in %.1f seconds...", M.disconnect_on_end.disconnect_delay))
         gui.notify:add(notif)
 
         local disconnect_time = game.global_vars.real_time + M.disconnect_on_end.disconnect_delay
@@ -8699,7 +8662,7 @@ function M.check_auto_rs()
         game.engine:client_cmd("say !rs")
 
         local reset_message = string.format("Auto RS triggered at %d:%d", current_kills, current_deaths)
-        local notif = gui.notification("Million.lua", reset_message)
+        local notif = gui.notification("Moon", reset_message)
         gui.notify:add(notif)
 
         M.auto_rs.has_sent_reset = true
@@ -9827,10 +9790,58 @@ events.present_queue:add(M.render_flying_hitlogs)
 
 function M.show_welcome_notification()
     local username = gui.ctx.user and gui.ctx.user.username or "Unknown"
-    local message = string.format("Welcome %s, Your Status is Premium", username)
-    local notif = gui.notification("Million.lua", message)
+    local message = string.format("Welcome %s, Your Status is supporter", username)
+    local notif = gui.notification("Moon", message)
     gui.notify:add(notif)
 end
+
+print("⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢻⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢳⠀⠀⠀⠀⢢⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢘⡄⠀⠀⠀⠀⢃⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠃⠀⠀⠀⠀⢨⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡸⠀⠀⠀⠀⠀⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣠⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⠀⠀⠀⠀⠀⢁⠂⠀⠀⠀⠀⠀⢠⣆⠀⠀⠀⠀⠀⢀⠔⠉⠠⠉⠰⡘⢠⠍⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⣰⠎⠀⠀⠀⠀⠀⠀⠈⠁⠀⠀⠀⠀⠀⠎⠀⠀⠀⠁⠀⢯⢄⠴⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠺⠆⠈⠃⣮⡁⠀⠀⠀⢀⡞⢀⠀⠀⠀⠀⠀⠯⠇⠀⡀⠀⠀⠀⠸⡧⢛⠩⠑⡀⢠⣸⠀⡠⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⠟⠀⣸⡷⠀⠀⠀⡼⠀⠀⢡⠀⠀⣤⣤⠀⠀⠨⣿⠆⠀⠀⠀⠑⠤⠤⠜⠁⢰⠃⠐⠂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡀⠀⠀⠀⠀⠀⠀⠘⣗⠀⠀⠠⡇⠀⠀⢸⠀⣠⠌⠉⠀⠀⠀⠀⠀⠀⠾⠀⠀⠀⠀⠀⡂⡞⠄⡸⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⠋⠀⠶⡀⠀⠀⠀⠀⢻⡄⠀⠀⢗⡀⠀⣸⠀⠰⡲⠀⠿⠀⠀⠀⣴⡵⠀⠀⠀⠀⠀⢐⡜⡀⣁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠸⠆⠠⣶⠀⠠⠶⠠⣦⠈⢳⣠⠀⠈⣆⠀⡯⠀⠀⣦⠀⡈⢀⣤⡄⠀⠀⠀⠀⠀⠀⢠⠞⠊⠀⠀⠈⠳⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡆⠀⠀⢀⣤⡀⢖⡄⠀⠀⠀⠀⠹⣆⡀⠙⡂⢰⡀⠀⠀⣠⣷⣆⠉⠐⠀⠻⠗⠀⠀⡰⠋⢀⡔⠀⢲⡀⠀⣏⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠐⢷⣀⠀⠈⠋⠀⣀⠀⠀⠀⠀⣁⡐⢈⡳⡂⠹⡄⢧⢂⣸⠹⢋⢠⢣⢳⣠⠀⠀⣡⠎⠀⠀⠘⣧⢒⠘⢀⡠⠋⢀⡀⣀⡄⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⣿⢦⡀⠀⠀⠘⠁⠀⠠⢸⣿⡍⠻⠒⢿⣦⠹⡄⢻⡟⠀⠘⡀⠘⣠⡣⣠⠞⠁⠀⠀⠀⠀⢈⠈⢉⠁⠀⠀⠈⢁⠙⠁⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⠶⡼⣕⠲⠦⢤⣀⣀⠘⢿⡵⡂⠀⠀⠉⠑⢎⣿⠁⠀⠀⠀⡆⣿⢾⡫⠠⣀⣤⡴⠿⢛⠿⡿⣿⠆⠀⣀⠀⠀⠀⠀⡀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠻⢶⣬⡳⣲⠢⣍⢳⡀⣷⠁⠀⡀⠀⠀⠄⢿⡀⠀⠀⠠⠁⣿⢽⣴⠿⠛⠁⠀⠈⠀⣰⡷⢁⠔⡪⠂⠐⢀⣨⠖⠂⠉⠉⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠍⠉⢛⠳⢔⣧⠘⣧⠀⢄⠀⡀⠀⠚⡷⠁⠀⠀⣰⣿⠏⠑⠠⠀⠀⠀⠠⣪⢟⣴⣗⣁⠦⠴⠛⣉⢀⡀⢤⡀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡠⢴⡲⣞⢲⣒⡲⢤⡤⢬⢆⡙⠷⡌⠳⣄⠂⠀⠀⠂⠶⡄⢠⣆⡿⠁⠀⠀⠀⢠⠔⠈⡡⢃⠊⠔⠀⠁⠐⠊⠽⣂⠉⠈⠑⠨⡺⡄⡀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⢠⠜⣃⣨⡧⡽⠞⠙⠓⠚⠑⠘⠚⠓⠤⡵⢠⣛⡲⣦⡀⢤⡔⣷⡜⣿⣡⡀⠐⠀⢀⢨⣠⣖⣑⠚⠶⢶⡶⢖⡤⠤⣄⠉⠐⠂⠐⠂⠓⠳⣅⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⣠⣿⠲⠋⠁⠀⢀⡤⣲⠲⠆⢶⠻⠖⢚⡴⠞⠉⠈⠀⠍⠻⣛⢯⣽⣻⡣⠯⠴⣶⠍⠉⠉⠀⠊⠉⠉⢟⣶⣌⡳⣬⡛⣦⠝⡄⠀⠀⠀⠀⠀⠀⠑")
+print("⠀⠀⠀⢀⣀⠤⠞⠋⠁⠀⠀⢀⠔⠃⡡⠴⣱⠖⠉⠠⣰⣏⡤⠊⡀⠚⢁⠀⠐⣴⢯⣭⣾⢮⢮⡹⢶⠆⠀⠐⢀⠀⠈⠀⢢⣘⡹⣿⣿⡝⢶⣽⢻⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡠⠋⣤⣪⡴⠋⠁⠀⠠⣺⣿⠝⣀⢀⡠⢉⣀⣠⣦⣴⠿⢻⠃⠡⠁⢌⠢⡂⠴⢄⠠⠤⠄⠴⠦⣔⣺⣿⣯⡙⠆⢻⣾⠀⠀⠀⢠⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⣀⣴⣿⡿⠞⠋⠁⠀⠀⠐⠑⠀⣿⣯⣴⢾⢿⣿⢿⣿⣿⢿⠏⠠⠁⡐⠀⡀⠰⠌⢷⣦⣶⡧⣤⡶⠚⢛⢛⠋⢩⢲⠀⠀⢸⡇⠀⠀⣀⡀⠃⠀⠀")
+print("⠀⠀⠀⠀⠈⠉⠋⠉⠉⠀⠀⠀⠀⠀⠀⠀⢨⡴⢇⣧⡁⠒⠛⠹⣹⡿⢋⢿⣾⡇⣘⡀⠄⠀⠄⠁⡚⠼⢟⠮⣿⡹⢺⣧⣛⢊⢁⣀⠁⠸⠛⠜⣀⠀⢀⡉⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⠀⠀⠀⠀⠀⡏⠘⢇⢸⠏⠀⣬⡾⣿⣹⢛⣦⣾⢿⣌⢇⡘⠄⠘⡀⣷⣿⣃⠀⠈⠳⣏⣀⠙⡲⣌⠋⠉⣎⠆⠀⣉⡴⠊⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠙⠃⠀⠞⠂⠀⠀⢻⣆⣀⣀⡠⣾⡟⠀⡀⠿⢦⡙⢫⢼⢟⣾⣶⢣⣰⢿⣾⠟⠈⠹⢦⡀⠙⣮⢥⠀⠨⡳⣜⠁⡖⢆⠲⠃⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠠⣾⡇⠀⠀⠀⠀⠈⠉⠉⣸⡟⢀⢙⠋⠀⢈⣁⡘⠛⠐⠹⣻⣿⢿⣿⠏⠀⠀⠀⠠⢿⡀⢈⢧⠓⠀⠘⠝⣷⣌⠁⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡀⡀⣿⠁⡀⠀⠀⠀⠈⠋⠂⠀⠀⠀⠁⠙⠹⠘⠀⠀⠀⠀⠀⠙⡇⠀⢹⣧⠀⠀⠈⢌⣿⡆⢃⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣌⡁⣷⠉⠤⠤⢠⡴⠶⣶⣤⠀⠀⠀⠀⠀⠀⠀⠀⢲⠆⣤⡟⠀⡇⠀⢈⢻⡄⠀⠀⠀⢻⣷⡜⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⣷⢻⡀⠀⠢⢺⣩⡇⠀⢹⡆⠀⠀⠀⠀⠀⠀⠀⠐⢆⡉⠡⠞⠀⠀⠘⣸⡇⠀⠀⠀⠀⣿⣱⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⡼⠳⣤⣀⠄⣂⣀⡤⠚⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⡇⠀⠀⠀⢰⣿⡇⠆⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠐⠁⢏⠨⣯⠉⠹⠆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⠁⠀⠀⠀⢸⣿⠄⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠉⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⣾⠋⠀⠀⠀⠀⣾⡿⠌⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣿⠇⠀⠀⠀⠀⠀⣿⡟⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠐⠖⠉⠀⠀⠀⠀⠀⢀⣾⣿⠂⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⣟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⡿⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣠⢤⣾⣿⠟⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⢤⣤⣶⡿⠞⠟⠊⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠀⠡⠀⠀⠁⠀⢀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠈⠡⠠⠄⠂⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+print("⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⠀⠀⠐⠀⠄⠂⠀⠠⠀⠂⠀⡀⠐⠀⠀⠂⠀⠠⠀⡀⢁⠂⠠⠀⠄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀")
+
 
 M.show_welcome_notification()
 
