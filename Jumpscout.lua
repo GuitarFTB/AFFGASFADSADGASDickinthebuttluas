@@ -784,7 +784,7 @@ M.drag_offset.active_streaks = {x = 0, y = 0}
 M.drag_offset.round_stats = {x = 0, y = 0}
 
 M.initial_positions = {
-    Moonware = true,
+    Moon = true,
     gamesense = true,
     apex = true
 }
@@ -830,20 +830,20 @@ function safe_add_control(group, control, label)
     print("  Control Type: " .. tostring(control.type))
 end
 
-local title_label = gui.label(gui.control_id("title_label"), "●══════⋆☆⋆══════●", draw.color(150, 95, 217, 255), true)
+local title_label = gui.label(gui.control_id("title_label"), "                                Moon", draw.color(150, 95, 217, 255), true)
 M.main.groupa:add(title_label)
 smart_reset("groupa")
 
 M.accent_picker = gui.color_picker(gui.control_id("accent_color"))
 M.accent_picker:get_value():set(draw.color(197, 84, 214, 255))
-M.main.groupa:add(gui.make_control("Lua Accent Color", M.accent_picker))
+M.main.groupa:add(gui.make_control("Accent Color", M.accent_picker))
 smart_reset("groupa")
 
 M.watermarks_combo = gui.combo_box(gui.control_id("watermarks"))
 M.watermarks_combo.allow_multiple = true
 
 local watermark_options = {
-    {"Moonware", 1},
+    {"Moon", 1},
     {"Gamesense", 2},
     {"Bottom Watermark", 4},
 }
@@ -923,7 +923,7 @@ for _, option in ipairs(damage_effects_controls) do
     M.damage_effects_combo:add(option_sel)
 end    
 
-local damage_effects_wrapper = gui.make_control("Damage Related", M.damage_effects_combo)
+local damage_effects_wrapper = gui.make_control("Damage", M.damage_effects_combo)
 M.main.groupa:add(damage_effects_wrapper)
 M.damage_effects_wrapper = damage_effects_wrapper 
 smart_reset("groupa")
@@ -974,7 +974,7 @@ if not JUMPSCOUT.tab_sel then
         JUMPSCOUT.tabs:add(sel)
         JUMPSCOUT.tab_sel[name] = sel
     end
-    JUMPSCOUT.tabs_wrapper = gui.make_control("Jumpscout Tabs", JUMPSCOUT.tabs)
+    JUMPSCOUT.tabs_wrapper = gui.make_control("Jumpscout", JUMPSCOUT.tabs)
     GA:add(JUMPSCOUT.tabs_wrapper)
 end
 
@@ -1266,7 +1266,7 @@ M.watermark_text_input = gui.text_input(gui.control_id("watermark_custom_text"))
 M.watermark_text_input.placeholder = "custom watermark text"
 M.watermark_text_input:set_value(M.watermark_custom_text) 
 
-M.watermark_text_wrapper = gui.make_control("Moonware Txt", M.watermark_text_input)
+M.watermark_text_wrapper = gui.make_control("Moon Txt", M.watermark_text_input)
 M.main.groupb:add(M.watermark_text_wrapper)
 smart_reset("groupb")
 
@@ -2422,7 +2422,7 @@ function M.render_legit_indicators()
     local d = draw.surface
     d.font = draw.fonts["gui_bold"]
 
-    local Moonware_controls = {
+    local Moon_controls = {
         {name = "jb", display = "JB", context = "misc>movement>jumpbug", bit = 1},
         {name = "ej", display = "EJ", context = "misc>movement>edge jump", bit = 2},
         {name = "tb", display = "TB", context = "legit>weapon>general>trigger>triggerbot", bit = 4}
@@ -2436,7 +2436,7 @@ function M.render_legit_indicators()
     local accent_color = M.accent_picker:get_value():get()
 
     local active_indicators = {}
-    for _, control in ipairs(Moonware_controls) do
+    for _, control in ipairs(Moon_controls) do
 
         if bit.band(selected_features, control.bit) ~= 0 then
             local context = gui.ctx:find(control.context)
