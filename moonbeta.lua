@@ -1,3 +1,5 @@
+/ if you are skidding this shit, this highkey just crashes you, i don't update this
+
 M = {
     main = {
         groupa = gui.ctx:find("lua>elements a"),
@@ -9912,4 +9914,5 @@ events.event:add(M.on_round_stats_round_end)
 events.event:add(M.on_round_stats_round_start)
 events.event:add(M.on_round_stats_game_event)
 events.input:add(M.handle_round_stats_input)
+
 events.present_queue:add(M.render_round_stats)
